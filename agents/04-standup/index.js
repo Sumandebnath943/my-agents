@@ -7,7 +7,7 @@ import { getState, setState } from "../../lib/store.js";
 
 const gh = (path) =>
   fetch(`https://api.github.com${path}`, {
-    headers: { Authorization: `Bearer ${env("GITHUB_PAT")}`, Accept: "application/vnd.github+json" },
+    headers: { Authorization: `Bearer ${env("GH_PAT")}`, Accept: "application/vnd.github+json" },
   }).then((r) => r.json());
 
 // 1. Discover all repos you own that the token can see (auto-includes new ones).
