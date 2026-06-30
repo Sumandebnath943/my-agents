@@ -1,0 +1,18 @@
+# .github/workflows/06-expiry.yml
+name: Expiry Watcher
+on:
+  schedule:
+    - cron: "0 4 * * 1"    # weekly, Monday
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/06-expiry/index.js
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
