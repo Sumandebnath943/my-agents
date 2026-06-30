@@ -1,0 +1,21 @@
+# .github/workflows/05-deps.yml
+name: Dependency Digest
+on:
+  schedule:
+    - cron: "30 3 * * 1"   # Mondays ~9 AM IST
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/05-deps/index.js
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}
