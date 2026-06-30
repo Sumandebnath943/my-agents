@@ -14,5 +14,6 @@ jobs:
       - run: npm ci
       - run: node agents/06-expiry/index.js
         env:
+          DIGEST: "1"   # always send the weekly countdown (not just on warnings)
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

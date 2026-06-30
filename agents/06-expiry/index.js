@@ -29,12 +29,31 @@ async function domainDaysLeft(domain) {
   } catch { return null; }
 }
 
+// DIGEST=1 -> always send the current countdown (the weekly status run).
+// No flag -> watch mode: stay silent unless something is within WARN_DAYS.
+const DIGEST = process.env.DIGEST === "1";
+
 const alerts = [];
+const status = [];
 for (const d of DOMAINS) {
   const [ssl, reg] = await Promise.all([sslDaysLeft(d), domainDaysLeft(d)]);
   if (ssl != null && ssl <= WARN_DAYS) alerts.push(`🔒 *${d}* SSL expires in ${ssl} days`);
   if (reg != null && reg <= WARN_DAYS) alerts.push(`🌐 *${d}* domain expires in ${reg} days`);
+  status.push(
+    `*${d}*\n` +
+    `🔒 SSL: ${ssl != null ? `${ssl} days left` : "n/a"}\n` +
+    `🌐 Domain: ${reg != null ? `${reg} days left` : "n/a"}`
+  );
 }
 
-if (alerts.length) await notifyTelegram(`⏰ *Expiry warning*\n\n${alerts.join("\n")}`);
-else console.log("All domains/certs healthy.");
+if (DIGEST) {
+  const header = alerts.length
+    ? `⏰ *Expiry status — ${alerts.length} need attention*`
+    : `✅ *Expiry status — all healthy*`;
+  await notifyTelegram(`${header}\n\n${status.join("\n\n")}`);
+} else if (alerts.length) {
+  await notifyTelegram(`⏰ *Expiry warning*\n\n${alerts.join("\n")}`);
+} else {
+  console.log("All domains/certs healthy.");
+}
+console.log(status.join("\n"));
