@@ -1,0 +1,33 @@
+# .github/workflows/verify-deploy.yml
+# COPY THIS INTO THE PROJECT REPO you want guarded, at: .github/workflows/verify-deploy.yml
+# Edit DEPLOY_URL (and the ROUTES list inside scripts/verify-deploy.js) for that project.
+name: Verify Deploy
+on:
+  push:
+    branches: [main]
+permissions:
+  issues: write          # lets the job open an issue on failure
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - id: check
+        run: node scripts/verify-deploy.js
+        continue-on-error: true
+        env:
+          DEPLOY_URL: https://your-live-site.com
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - if: steps.check.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔴 Deploy verification failed (${context.sha.slice(0,7)})`,
+              body: `A push to main deployed but route checks failed. See the run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
