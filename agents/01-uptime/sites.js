@@ -8,6 +8,7 @@ export const SITES = [
   { name: "Slide Doctor",       url: "https://slidedoctor.houseofnamus.com/" },
   { name: "Ember",              url: "https://ember.houseofnamus.com/" },
   { name: "Crawl Daddy",        url: "https://crawldaddy.houseofnamus.com/" },
+  { name: "Crawl Daddy App",    url: "https://crawldaddy--houseofnamus.replit.app/" },
   { name: "Brief Killer",       url: "https://briefkiller.houseofnamus.com/" },
   { name: "Brief Killer 2",     url: "https://briefkiller2.houseofnamus.com/" },
   { name: "Repurpose AI",       url: "https://repurposeai.houseofnamus.com/" },
