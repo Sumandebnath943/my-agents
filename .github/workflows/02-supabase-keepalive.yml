@@ -1,0 +1,19 @@
+# .github/workflows/02-supabase-keepalive.yml
+name: Supabase Keep-Alive
+on:
+  schedule:
+    - cron: "0 3 * * *"   # daily, well within the 7-day window
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - run: node agents/02-supabase-keepalive/index.js
+        env:
+          SUPABASE_PROJECTS: ${{ secrets.SUPABASE_PROJECTS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
