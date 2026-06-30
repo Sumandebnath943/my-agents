@@ -1,0 +1,12 @@
+{
+  "name": "ai-agents",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "hello": "node agents/00-hello/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
