@@ -24,11 +24,20 @@ async function ping(p) {
 const results = await Promise.all(projects.map(ping));
 const paused = results.filter((r) => !r.ok);
 
+// DIGEST=1 -> also send a healthy "all clear" confirmation (the weekly run).
+// No flag -> alert-only: stay silent unless something looks paused (daily run).
+const DIGEST = process.env.DIGEST === "1";
+
 if (paused.length) {
   const lines = paused
     .map((p) => `🔴 *${p.name}* may be PAUSED (code ${p.code}). Restore: supabase.com/dashboard`)
     .join("\n");
   await notifyTelegram(`⚠️ *Supabase alert*\n\n${lines}`);
+} else if (DIGEST) {
+  const lines = results.map((r) => `✅ *${r.name}* — OK (${r.code})`).join("\n");
+  await notifyTelegram(
+    `🟢 *Supabase weekly check*\n\nAll ${results.length} projects pinged OK.\n\n${lines}`
+  );
 } else {
   console.log(`All ${results.length} Supabase projects pinged OK.`);
 }
