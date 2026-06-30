@@ -1,0 +1,20 @@
+# .github/workflows/01-uptime-watch.yml
+# Frequent watch every 30 min — NO DIGEST flag, so it only pings when a site is down.
+name: Uptime Sentinel (Watch)
+on:
+  schedule:
+    - cron: "*/30 * * * *" # every 30 min
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm ci
+      - run: node agents/01-uptime/index.js
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
