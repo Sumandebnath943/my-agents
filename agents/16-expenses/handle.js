@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { downloadFileBase64 } from "../../lib/telegram-poll.js";
 import { callGemini, parseJson } from "../../lib/llm.js";
-import { notifyTelegram } from "../../lib/notify.js";
+import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
@@ -23,6 +23,9 @@ If a field is unreadable, use your best guess.`,
     merchant: e.merchant, amount: e.amount, currency: e.currency,
     category: e.category, spent_on: e.spent_on,
   });
-  await notifyTelegram(`💸 Logged: *${e.merchant}* ${e.currency} ${e.amount} (${e.category})`);
+  await notifyTelegram(
+    `💸 <b>Expense logged</b>\n${tgEscape(e.merchant)} — ${tgEscape(e.currency)} ${tgEscape(e.amount)}\n📁 ${tgEscape(e.category)}`,
+    { html: true }
+  );
   return true;
 }

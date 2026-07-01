@@ -5,7 +5,7 @@ import { CHANNELS, AI_KEYWORDS } from "./channels.js";
 import { getState, setState } from "../../lib/store.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { notifyEmail } from "../../lib/notify.js";
-import { renderDigest } from "../../lib/email-template.js";
+import { renderEmail } from "../../lib/email-template.js";
 
 const WINDOW_MS = 24 * 3600 * 1000;                     // "new" = uploaded in the last 24h
 const AI_RE = new RegExp(`\\b(${AI_KEYWORDS.join("|")})\\b`, "i");
@@ -69,17 +69,24 @@ videos.sort((a, b) => b.published - a.published);
 if (!videos.length) { console.log("No new videos in the last 24h."); process.exit(0); }
 
 const rel = (t) => { const h = Math.round((Date.now() - t) / 3600000); return h <= 1 ? "just now" : `${h}h ago`; };
-const sections = [{
-  heading: `${videos.length} new video${videos.length > 1 ? "s" : ""} today`,
-  items: videos.map((v) => ({ title: `${v.channel} — ${v.title}`, note: rel(v.published), link: v.link })),
+const blocks = [{
+  type: "listSection",
+  ramp: "red",
+  heading: `🎬 ${videos.length} NEW VIDEO${videos.length > 1 ? "S" : ""}`,
+  items: videos.map((v) => ({
+    title: `${v.channel} — ${v.title}`,
+    note: rel(v.published),
+    link: v.link,
+    buttonLabel: "▶ Watch",
+  })),
 }];
 
 const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
-const html = renderDigest({
+const html = renderEmail({
   title: "🎬 Evening Video Digest",
-  subtitle: today,
-  sections,
-  accent: "#e74c3c",
+  kicker: `EVENING EDITION · ${today}`,
+  accent: "#C0392B",
+  blocks,
   footer: "Newest uploads from your channels + curated AI voices.",
 });
 await notifyEmail("🎬 Your evening video digest", html);

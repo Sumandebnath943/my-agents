@@ -4,7 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callGemini, parseJson } from "../../lib/llm.js";
-import { notifyTelegram } from "../../lib/notify.js";
+import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const URL_RE = /https?:\/\/[^\s]+/g;
@@ -30,8 +30,12 @@ URL: ${url}\nContent: ${text || "(could not fetch; infer from URL)"}`,
     );
     const { title, summary, tags } = parseJson(out);
     await db.from("reading").insert({ url, title, summary, tags });
+    const tagLine = (tags || []).length ? `\n🏷️ ${tgEscape((tags || []).join(" · "))}` : "";
+    await notifyTelegram(
+      `📚 <b>Saved to your reading queue</b>\n${tgEscape(title)}${tagLine}`,
+      { html: true, buttons: [{ text: "📖 Open article", url }] }
+    );
     saved++;
   }
-  if (saved) await notifyTelegram(`📚 Saved *${saved}* link(s) to your reading queue.`);
   return saved;
 }

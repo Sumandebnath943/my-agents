@@ -6,6 +6,7 @@ import { env } from "../../lib/env.js";
 import { callGroq, parseJson } from "../../lib/llm.js";
 import { notifyTelegram } from "../../lib/notify.js";
 
+
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
 // Strict trigger: "slept"/"woke"/"productivity" rarely appear in casual prose, so
@@ -23,6 +24,6 @@ export async function handleHabit(msg) {
   );
   const h = parseJson(out);
   await db.from("habits").insert({ log_date: new Date().toISOString().slice(0, 10), ...h });
-  await notifyTelegram(`📊 Habit log saved.`);
+  await notifyTelegram(`📊 <b>Habit log saved</b>`, { html: true });
   return true;
 }

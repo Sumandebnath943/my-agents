@@ -2,7 +2,7 @@
 import { INTERESTS, RSS_FEEDS } from "./sources.js";
 import { callGemini, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
-import { renderDigest } from "../../lib/email-template.js";
+import { renderEmail } from "../../lib/email-template.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 
 async function readFeed(url) {
@@ -44,13 +44,36 @@ let sections = [];
 try { sections = parseJson(out).sections || []; } catch { sections = []; }
 if (!sections.length) { console.log("Curator returned nothing usable."); process.exit(0); }
 
+// Build a hybrid layout: hero top story + two colored quick-hit tiles + stat + themed lists.
+const flat = sections.flatMap((s) => (s.items || []).map((it) => ({ ...it, heading: s.heading })));
+const used = new Set();
+const take = (it) => { used.add(it.title); return it; };
+
+const hero = flat[0] ? take(flat[0]) : null;
+const quick = flat.slice(1, 3).map(take);
+const cycle = ["purple", "teal", "coral", "blue", "amber", "pink"];
+
+const blocks = [];
+if (hero) blocks.push({ type: "hero", ramp: "purple", kicker: "⭐ TOP STORY", title: hero.title, note: hero.note, link: hero.link, buttonLabel: "Read →" });
+if (quick.length) {
+  blocks.push({
+    type: "tiles",
+    items: quick.map((q, i) => ({ ramp: cycle[(i + 1) % cycle.length], span: "half", label: q.heading, headline: q.title, link: q.link })),
+  });
+}
+blocks.push({ type: "stat", text: `📊 ${flat.length} stories · ${sections.length} themes` });
+sections.forEach((s, i) => {
+  const items = (s.items || []).filter((it) => !used.has(it.title));
+  if (items.length) blocks.push({ type: "listSection", ramp: cycle[i % cycle.length], heading: s.heading, items });
+});
+
 const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
-const html = renderDigest({
-  title: "🗞️ Your Daily Tech Briefing",
-  subtitle: today,
-  sections,
-  accent: "#6C5CE7",
-  footer: "Curated from Hacker News, Google News, TechCrunch, The Verge & more.",
+const html = renderEmail({
+  title: "🗞️ Daily Tech Briefing",
+  kicker: `MORNING EDITION · ${today}`,
+  accent: "#534AB7",
+  blocks,
+  footer: "Curated from Hacker News · Google News · TechCrunch · The Verge",
 });
 
 await notifyEmail("🗞️ Your daily tech briefing", html);

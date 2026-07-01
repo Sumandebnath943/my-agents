@@ -4,7 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callGroq, parseJson } from "../../lib/llm.js";
-import { notifyTelegram } from "../../lib/notify.js";
+import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
@@ -22,6 +22,6 @@ export async function handleJournal(msg) {
     entry_date: new Date().toISOString().slice(0, 10),
     raw: msg.text, mood, themes, summary,
   });
-  await notifyTelegram(`🌙 Saved your reflection. _(mood: ${mood})_`);
+  await notifyTelegram(`🌙 <b>Reflection saved</b>\nmood: ${tgEscape(mood)}`, { html: true });
   return true;
 }
