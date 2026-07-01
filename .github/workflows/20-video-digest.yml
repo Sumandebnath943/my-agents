@@ -1,4 +1,4 @@
-# .github/workflows/18-video-digest.yml
+# .github/workflows/20-video-digest.yml
 name: Evening Video Digest
 on:
   schedule:
@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
       - run: npm ci
-      - run: node agents/18-video-digest/index.js
+      - run: node agents/20-video-digest/index.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

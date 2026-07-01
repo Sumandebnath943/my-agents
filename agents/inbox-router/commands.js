@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { generateNotes } from "../14-notes/generate.js";
+import { addIdea, listIdeas } from "../18-ideas/ideas.js";
 
 // Lazy DB so importing this module (e.g. to read command metadata) needs no Supabase env.
 let _db;
@@ -66,12 +67,30 @@ async function notes(args) {
   }
 }
 
+async function idea(args) {
+  const text = args.join(" ").trim();
+  if (!text) return notifyTelegram(`💡 Usage: <code>/idea your one-line idea</code>`, { html: true });
+  await notifyTelegram(`💡 Spec'ing that idea… (~15s)`, { html: true });
+  const r = await addIdea(text);
+  const prompt = r.prompt ? `\n\n<b>Claude Code prompt:</b>\n<code>${tgEscape(r.prompt)}</code>` : "";
+  return notifyTelegram(`💡 <b>${tgEscape(r.title)}</b> saved · score ${r.score}${prompt}`, { html: true });
+}
+
+async function ideas() {
+  const list = await listIdeas(15);
+  if (!list.length) return notifyTelegram(`💡 <b>Backlog</b>\nEmpty. Add one with /idea &lt;text&gt;`, { html: true });
+  const body = list.map((i) => `[${i.score}] <b>${tgEscape(i.title)}</b> — ${tgEscape(i.spec?.problem || "")}`).join("\n");
+  return notifyTelegram(`💡 <b>Idea backlog</b>\n\n${body}`, { html: true });
+}
+
 export const COMMANDS = {
   journal:  { description: "Recent journal entries (e.g. /journal last week)", handler: journal },
   reading:  { description: "Your unread saved links", handler: reading },
   expenses: { description: "Spend summary (e.g. /expenses month)", handler: expenses },
   habits:   { description: "Recent habit logs (e.g. /habits 14)", handler: habits },
   notes:    { description: "Notes from a video/article: /notes <url>", handler: notes },
+  idea:     { description: "Save + spec a new idea: /idea <one-liner>", handler: idea },
+  ideas:    { description: "Your ranked idea backlog", handler: ideas },
 };
 
 export async function runCommand(text) {
