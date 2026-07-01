@@ -3,6 +3,7 @@
 // Each handler receives the parsed args array and replies via Telegram.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
+import { getState } from "../../lib/store.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { generateNotes } from "../14-notes/generate.js";
 import { addIdea, listIdeas } from "../18-ideas/ideas.js";
@@ -83,6 +84,16 @@ async function ideas() {
   return notifyTelegram(`💡 <b>Idea backlog</b>\n\n${body}`, { html: true });
 }
 
+async function drafts() {
+  const q = (await getState("linkedin:queue", [])) || [];
+  const pending = q.filter((d) => d.status === "pending");
+  if (!pending.length) return notifyTelegram(`📝 <b>Drafts</b>\nNo pending LinkedIn drafts.`, { html: true });
+  await notifyTelegram(`📝 <b>${pending.length} pending draft(s)</b>`, { html: true });
+  for (const d of pending.slice(-5)) {
+    await notifyTelegram(`<i>id ${d.id}</i>\n\n${tgEscape(d.text)}`, { html: true });
+  }
+}
+
 export const COMMANDS = {
   journal:  { description: "Recent journal entries (e.g. /journal last week)", handler: journal },
   reading:  { description: "Your unread saved links", handler: reading },
@@ -91,6 +102,7 @@ export const COMMANDS = {
   notes:    { description: "Notes from a video/article: /notes <url>", handler: notes },
   idea:     { description: "Save + spec a new idea: /idea <one-liner>", handler: idea },
   ideas:    { description: "Your ranked idea backlog", handler: ideas },
+  drafts:   { description: "Your pending LinkedIn drafts", handler: drafts },
 };
 
 export async function runCommand(text) {

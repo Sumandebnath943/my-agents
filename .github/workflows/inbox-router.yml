@@ -3,7 +3,7 @@
 name: Inbox Router
 on:
   schedule:
-    - cron: "*/30 * * * *"   # check for new messages to the bot every 30 min
+    - cron: "*/5 * * * *"   # poll for new messages every ~5 min (repo is public = unlimited minutes)
   workflow_dispatch:
 jobs:
   run:
