@@ -1,7 +1,7 @@
 // agents/06-expiry/index.js
 import tls from "node:tls";
 import { DOMAINS, WARN_DAYS } from "./domains.js";
-import { notifyTelegram } from "../../lib/notify.js";
+import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 function sslDaysLeft(host) {
   return new Promise((resolve) => {
@@ -37,10 +37,10 @@ const alerts = [];
 const status = [];
 for (const d of DOMAINS) {
   const [ssl, reg] = await Promise.all([sslDaysLeft(d), domainDaysLeft(d)]);
-  if (ssl != null && ssl <= WARN_DAYS) alerts.push(`🔒 *${d}* SSL expires in ${ssl} days`);
-  if (reg != null && reg <= WARN_DAYS) alerts.push(`🌐 *${d}* domain expires in ${reg} days`);
+  if (ssl != null && ssl <= WARN_DAYS) alerts.push(`🔒 <b>${tgEscape(d)}</b> SSL expires in ${ssl} days`);
+  if (reg != null && reg <= WARN_DAYS) alerts.push(`🌐 <b>${tgEscape(d)}</b> domain expires in ${reg} days`);
   status.push(
-    `*${d}*\n` +
+    `<b>${tgEscape(d)}</b>\n` +
     `🔒 SSL: ${ssl != null ? `${ssl} days left` : "n/a"}\n` +
     `🌐 Domain: ${reg != null ? `${reg} days left` : "n/a"}`
   );
@@ -48,11 +48,11 @@ for (const d of DOMAINS) {
 
 if (DIGEST) {
   const header = alerts.length
-    ? `⏰ *Expiry status — ${alerts.length} need attention*`
-    : `✅ *Expiry status — all healthy*`;
-  await notifyTelegram(`${header}\n\n${status.join("\n\n")}`);
+    ? `⏰ <b>Expiry status — ${alerts.length} need attention</b>`
+    : `✅ <b>Expiry status — all healthy</b>`;
+  await notifyTelegram(`${header}\n\n${status.join("\n\n")}`, { html: true });
 } else if (alerts.length) {
-  await notifyTelegram(`⏰ *Expiry warning*\n\n${alerts.join("\n")}`);
+  await notifyTelegram(`⏰ <b>Expiry warning</b>\n\n${alerts.join("\n")}`, { html: true });
 } else {
   console.log("All domains/certs healthy.");
 }

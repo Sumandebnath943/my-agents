@@ -1,0 +1,16 @@
+# .github/workflows/register-commands.yml
+# Run once (and after adding/renaming commands) to populate Telegram's "/" autocomplete menu.
+name: Register Bot Commands
+on:
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/inbox-router/register-commands.js
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

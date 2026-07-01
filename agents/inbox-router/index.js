@@ -8,6 +8,7 @@ import { handleReadLater } from "../13-readlater/handle.js";
 import { handleExpense } from "../16-expenses/handle.js";
 import { handleHabit, isHabitLog } from "../17-habits/handle.js";
 import { handleJournal } from "../15-journal/handle.js";
+import { runCommand } from "./commands.js";
 
 const messages = await getNewMessages();
 if (!messages.length) { console.log("No new messages."); process.exit(0); }
@@ -18,10 +19,8 @@ for (const msg of messages) {
       await handleExpense(msg);                    // receipt photo -> expense
       console.log("routed: expense");
     } else if (msg.text.trim().startsWith("/")) {
-      // RESERVED for the future two-way command agent (e.g. "/spend this week").
-      // Kept out of the journal so commands never become reflections.
-      // TODO: dispatch to a command handler once the two-way bot is built.
-      console.log("routed: command (stub, ignored):", msg.text.slice(0, 60));
+      await runCommand(msg.text);                   // two-way command (/journal, /notes, …)
+      console.log("routed: command", msg.text.slice(0, 40));
     } else if (/https?:\/\//.test(msg.text)) {
       const n = await handleReadLater(msg);        // link(s) -> reading queue
       console.log(`routed: readlater (${n} saved)`);

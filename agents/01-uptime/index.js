@@ -1,7 +1,7 @@
 // agents/01-uptime/index.js
 import { SITES, SLOW_MS } from "./sites.js";
 import { callGroq } from "../../lib/llm.js";
-import { notifyTelegram } from "../../lib/notify.js";
+import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 async function check(site) {
   const start = Date.now();
@@ -24,7 +24,7 @@ const problems = results.filter((r) => r.status !== "UP");
 
 // Build a digest. Only invoke the LLM if there's something to explain.
 let body = results
-  .map((r) => `${r.status === "UP" ? "✅" : r.status === "SLOW" ? "🟡" : "🔴"} *${r.name}* — ${r.status} (${r.code || "no response"}, ${r.ms}ms)`)
+  .map((r) => `${r.status === "UP" ? "✅" : r.status === "SLOW" ? "🟡" : "🔴"} <b>${tgEscape(r.name)}</b> — ${r.status} (${r.code || "no response"}, ${r.ms}ms)`)
   .join("\n");
 
 if (problems.length) {
@@ -32,17 +32,17 @@ if (problems.length) {
     { role: "system", content: "You are an SRE. In 1-2 sentences each, give the most likely cause and first thing to check. Be specific and brief." },
     { role: "user", content: `These sites have issues:\n${problems.map((p) => `- ${p.name}: ${p.status} code=${p.code} err=${p.error || "none"}`).join("\n")}` },
   ]);
-  body += `\n\n*Likely causes:*\n${explanation}`;
+  body += `\n\n<b>Likely causes:</b>\n${tgEscape(explanation)}`;
 }
 
 const header = problems.length
-  ? `🚨 *Uptime: ${problems.length} issue(s)*`
-  : `✅ *Uptime: all ${results.length} sites healthy*`;
+  ? `🚨 <b>Uptime: ${problems.length} issue(s)</b>`
+  : `✅ <b>Uptime: all ${results.length} sites healthy</b>`;
 
 // DIGEST=1 -> always send the full report (the daily + 6-hourly runs).
 // No flag -> "watch" mode: only ping when something is actually down.
 const DIGEST = process.env.DIGEST === "1";
 if (DIGEST || problems.length) {
-  await notifyTelegram(`${header}\n\n${body}`);
+  await notifyTelegram(`${header}\n\n${body}`, { html: true });
 }
 console.log(body);

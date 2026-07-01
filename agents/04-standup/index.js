@@ -2,7 +2,7 @@
 import { env } from "../../lib/env.js";
 import { OWNER, IGNORE } from "./repos.js";
 import { callGroq } from "../../lib/llm.js";
-import { notifyTelegram } from "../../lib/notify.js";
+import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { getState, setState } from "../../lib/store.js";
 
 const gh = (path) =>
@@ -63,10 +63,10 @@ const brief = await callGroq([
   { role: "user", content: raw },
 ]);
 
-let msg = `☀️ *Morning standup*\n\n${brief}`;
+let msg = `☀️ <b>Morning standup</b>\n\n${tgEscape(brief)}`;
 if (newRepos.length) {
-  msg += `\n\n🆕 *New repo(s) since last standup:* ${newRepos.join(", ")}`;
+  msg += `\n\n🆕 <b>New repo(s) since last standup:</b> ${tgEscape(newRepos.join(", "))}`;
 }
 
-await notifyTelegram(msg);
+await notifyTelegram(msg, { html: true });
 console.log(msg);

@@ -1,6 +1,6 @@
 // agents/02-supabase-keepalive/index.js
 import { env } from "../../lib/env.js";
-import { notifyTelegram } from "../../lib/notify.js";
+import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const projects = JSON.parse(env("SUPABASE_PROJECTS"));
 
@@ -30,13 +30,14 @@ const DIGEST = process.env.DIGEST === "1";
 
 if (paused.length) {
   const lines = paused
-    .map((p) => `🔴 *${p.name}* may be PAUSED (code ${p.code}). Restore: supabase.com/dashboard`)
+    .map((p) => `🔴 <b>${tgEscape(p.name)}</b> may be PAUSED (code ${p.code}). Restore: supabase.com/dashboard`)
     .join("\n");
-  await notifyTelegram(`⚠️ *Supabase alert*\n\n${lines}`);
+  await notifyTelegram(`⚠️ <b>Supabase alert</b>\n\n${lines}`, { html: true });
 } else if (DIGEST) {
-  const lines = results.map((r) => `✅ *${r.name}* — OK (${r.code})`).join("\n");
+  const lines = results.map((r) => `✅ <b>${tgEscape(r.name)}</b> — OK (${r.code})`).join("\n");
   await notifyTelegram(
-    `🟢 *Supabase weekly check*\n\nAll ${results.length} projects pinged OK.\n\n${lines}`
+    `🟢 <b>Supabase weekly check</b>\n\nAll ${results.length} projects pinged OK.\n\n${lines}`,
+    { html: true }
   );
 } else {
   console.log(`All ${results.length} Supabase projects pinged OK.`);

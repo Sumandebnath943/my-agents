@@ -1,8 +1,9 @@
 // agents/05-deps/index.js
 import { env } from "../../lib/env.js";
 import { OWNER, IGNORE } from "./repos.js";
-import { callGemini } from "../../lib/llm.js";
+import { callGemini, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
+import { renderEmail } from "../../lib/email-template.js";
 
 const gh = (path) =>
   fetch(`https://api.github.com${path}`, {
@@ -78,9 +79,33 @@ for (const repo of repos) {
 if (!findings.length) {
   console.log("No outdated or vulnerable deps found.");
 } else {
-  const summary = await callGemini(
-    `You are a security-savvy lead dev. Given this list of outdated/vulnerable npm packages across my repos, group by urgency (security first, then major-version bumps, then minor). For each, one line: what it is and whether I should act now. Be concise.\n\n${JSON.stringify(findings, null, 2)}`
+  const out = await callGemini(
+    `You are a security-savvy lead dev. Group these outdated/vulnerable npm packages by urgency.
+Return ONLY JSON: {"security":[{"name":"","repo":"","note":""}],"major":[...],"minor":[...]}.
+- security = has known vulnerabilities (act now). major = major-version bump. minor = minor/patch bump.
+- note = one short line: what it is and whether to act.
+Findings:\n${JSON.stringify(findings, null, 2)}`,
+    { json: true }
   );
-  await notifyEmail("🔐 Weekly dependency & security digest", `<pre>${summary}</pre>`);
-  console.log(summary);
+  let g = {};
+  try { g = parseJson(out); } catch { g = {}; }
+  const mk = (arr) => (arr || []).map((x) => ({
+    title: `${x.name}${x.repo ? ` — ${x.repo}` : ""}`,
+    note: x.note,
+    link: `https://www.npmjs.com/package/${x.name}`,
+  }));
+  const blocks = [{ type: "stat", text: `🔐 ${findings.length} packages flagged across your repos` }];
+  if (g.security?.length) blocks.push({ type: "listSection", ramp: "red", heading: "🔴 SECURITY — ACT NOW", items: mk(g.security) });
+  if (g.major?.length) blocks.push({ type: "listSection", ramp: "amber", heading: "🟠 MAJOR BUMPS", items: mk(g.major) });
+  if (g.minor?.length) blocks.push({ type: "listSection", ramp: "gray", heading: "⚪ MINOR / PATCH", items: mk(g.minor) });
+
+  const html = renderEmail({
+    title: "🔐 Dependency & Security Digest",
+    kicker: "WEEKLY REPORT",
+    accent: "#BA7517",
+    blocks,
+    footer: "Sources: npm registry + OSV.dev",
+  });
+  await notifyEmail("🔐 Weekly dependency & security digest", html);
+  console.log(JSON.stringify(g, null, 2));
 }
