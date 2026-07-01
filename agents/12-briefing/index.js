@@ -1,25 +1,19 @@
 // agents/12-briefing/index.js
-import { XMLParser } from "fast-xml-parser";
 import { INTERESTS, RSS_FEEDS } from "./sources.js";
 import { callGemini, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderDigest } from "../../lib/email-template.js";
-
-const parser = new XMLParser();
+import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 
 async function readFeed(url) {
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 15000);
-    const xml = await fetch(url, { signal: ctrl.signal }).then((r) => r.text());
-    clearTimeout(t);
-    const feed = parser.parse(xml);
+    const feed = await fetchXml(url);
     // Handle both RSS (channel.item) and Atom (feed.entry) shapes.
     const items = feed?.rss?.channel?.item || feed?.feed?.entry || [];
     const arr = Array.isArray(items) ? items : [items];
     return arr.slice(0, 15).map((it) => ({
-      title: (it.title?.["#text"] || it.title || "").toString().trim(),
-      link: (it.link?.href || it.link || "").toString().trim(),
+      title: textOf(it.title),
+      link: linkHref(it.link),
     }));
   } catch (e) {
     console.error(`feed failed: ${url}`, e.message);
