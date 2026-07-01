@@ -1,3 +1,8 @@
 node_modules/
 .env
 *.local
+
+# Local project docs — keep out of the public repo
+HANDOFF.md
+PROJECT_BIBLE.md
+PORTFOLIO_HANDOFF.md
