@@ -1,0 +1,20 @@
+# .github/workflows/12-briefing.yml
+name: Daily Tech Briefing
+on:
+  schedule:
+    - cron: "0 2 * * *"    # ~7:30 AM IST
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/12-briefing/index.js
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}

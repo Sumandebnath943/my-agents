@@ -1,0 +1,24 @@
+# .github/workflows/14-notes.yml
+# On-demand: paste a YouTube/article URL and get structured notes emailed to you.
+name: Video/Article Notes
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "YouTube video or article URL to turn into notes"
+        required: true
+        type: string
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/14-notes/index.js "${{ github.event.inputs.url }}"
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}

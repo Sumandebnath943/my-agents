@@ -7,6 +7,7 @@
     "hello": "node agents/00-hello/index.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "fast-xml-parser": "^5.9.3"
   }
 }

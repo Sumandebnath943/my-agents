@@ -1,0 +1,19 @@
+# .github/workflows/15-journal-prompt.yml
+# NOTE: reply CAPTURE is handled by the Inbox Router. This just sends the evening nudge.
+name: Journal Evening Prompt
+on:
+  schedule:
+    - cron: "30 16 * * *"   # ~10:00 PM IST
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/15-journal/prompt.js
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
