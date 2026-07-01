@@ -23,4 +23,4 @@ export const SITES = [
   { name: "Forget Anything",    url: "https://sumandebnath.houseofnamus.com/apps/forget-anything" },
 ];
 
-export const SLOW_MS = 3000; // flag anything slower than 3s as "degraded"
+export const SLOW_MS = 6000; // flag anything slower than 6s as "degraded" (fewer false yellows)
