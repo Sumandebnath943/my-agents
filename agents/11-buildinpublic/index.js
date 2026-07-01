@@ -1,8 +1,9 @@
 // agents/11-buildinpublic/index.js
-// Draft-only: turn the day's git activity into a short build-in-public post → Telegram.
+// Draft-only: turn the day's git activity into a short build-in-public post → email.
 import { env } from "../../lib/env.js";
 import { callGroq } from "../../lib/llm.js";
-import { notifyTelegram, tgEscape } from "../../lib/notify.js";
+import { notifyEmail } from "../../lib/notify.js";
+import { renderEmail } from "../../lib/email-template.js";
 import { PROFILE } from "../../lib/profile.js";
 
 const OWNER = "Sumandebnath943";
@@ -37,5 +38,13 @@ const post = await callGroq([
   { role: "user", content: `Today I worked on:${work}` },
 ]);
 
-await notifyTelegram(`🛠️ <b>Build-in-public draft</b>\n\n${tgEscape(post)}`, { html: true });
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const html = renderEmail({
+  title: "🛠️ Build-in-Public Draft",
+  kicker: "SHIPPED TODAY",
+  accent: "#0F6E56",
+  blocks: [{ type: "text", html: esc(post).replace(/\n/g, "<br>") }],
+  footer: "Drop it on X / LinkedIn when ready",
+});
+await notifyEmail("🛠️ Your build-in-public draft", html);
 console.log(post);

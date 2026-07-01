@@ -1,9 +1,10 @@
 // agents/10-linkedin/10a-draft.js
 // Draft-only, NEWS-REACTIVE: pull today's AI news, pick the most relevant item, and
-// write a LinkedIn thought-leadership post that wraps YOUR experience + beliefs + voice
-// around it. Sends to Telegram for approval and saves to a queue. (Never auto-posts.)
+// write a LinkedIn thought-leadership post wrapping YOUR experience + beliefs + voice
+// around it. Emails you the draft and saves it to a queue. (Never auto-posts.)
 import { callGemini, parseJson } from "../../lib/llm.js";
-import { notifyTelegram, tgEscape } from "../../lib/notify.js";
+import { notifyEmail } from "../../lib/notify.js";
+import { renderEmail } from "../../lib/email-template.js";
 import { getState, setState } from "../../lib/store.js";
 import { PROFILE, profileContext } from "../../lib/profile.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
@@ -53,9 +54,17 @@ const id = Date.now();
 queue.push({ id, text: post, source: o.link || null, headline: o.headline || null, status: "pending", created_at: new Date().toISOString() });
 await setState("linkedin:queue", queue);
 
-const buttons = o.link ? [{ text: "📰 Source", url: o.link }] : undefined;
-await notifyTelegram(
-  `📝 <b>LinkedIn draft</b> <i>(id ${id})</i>${o.headline ? `\n<i>Re: ${tgEscape(o.headline)}</i>` : ""}\n\n${tgEscape(post)}\n\n<i>Copy-paste when you like it · see all with /drafts</i>`,
-  { html: true, buttons }
-);
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const blocks = [];
+if (o.headline) blocks.push({ type: "hero", ramp: "blue", kicker: "REACTING TO", title: o.headline, link: o.link || undefined, buttonLabel: o.link ? "📰 Read the source" : undefined });
+blocks.push({ type: "text", html: esc(post).replace(/\n/g, "<br>") });
+
+const html = renderEmail({
+  title: "📝 Your LinkedIn Draft",
+  kicker: "THOUGHT LEADERSHIP",
+  accent: "#185FA5",
+  blocks,
+  footer: "Copy-paste to LinkedIn when you like it · saved to your /drafts queue",
+});
+await notifyEmail("📝 Your LinkedIn draft is ready", html);
 console.log(post);
