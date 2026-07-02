@@ -1,9 +1,9 @@
 # .github/workflows/inbox-router.yml
-# Single poller for all Telegram-input agents (#13 links, #15 journal, #16 receipts, #17 habits).
-name: Inbox Router
+# DEPRECATED as the live poller — replaced by the Telegram WEBHOOK (dashboard /api/telegram
+# → telegram-webhook.yml). Polling can't run while a webhook is set (Telegram 409).
+# Kept as manual-only for fallback/testing. To go back to polling, delete the webhook first.
+name: Inbox Router (deprecated poller)
 on:
-  schedule:
-    - cron: "*/5 * * * *"   # poll for new messages every ~5 min (repo is public = unlimited minutes)
   workflow_dispatch:
 jobs:
   run:
