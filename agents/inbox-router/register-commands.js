@@ -8,6 +8,17 @@ const commands = Object.entries(COMMANDS).map(([command, c]) => ({
   command,
   description: c.description.slice(0, 256),
 }));
+// On-demand agent triggers (handled by the webhook).
+commands.push(
+  { command: "briefing", description: "Run the Daily Tech Briefing now" },
+  { command: "video", description: "Run the Evening Video Digest now" },
+  { command: "standup", description: "Run the Morning Standup now" },
+  { command: "deps", description: "Run the Dependency Digest now" },
+  { command: "uptime", description: "Run an uptime check now" },
+  { command: "expiry", description: "Run the Expiry Watcher now" },
+  { command: "review", description: "Run the Weekly Founder Review now" },
+  { command: "linkedin", description: "Generate a LinkedIn draft now" },
+);
 commands.push({ command: "help", description: "List all commands" });
 
 const res = await fetch(
