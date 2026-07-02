@@ -1,0 +1,21 @@
+# .github/workflows/10-linkedin-recap.yml
+name: LinkedIn Weekly Recap
+on:
+  schedule:
+    - cron: "30 14 * * 0"   # Sundays ~8 PM IST
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/10-linkedin/10d-recap.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}
