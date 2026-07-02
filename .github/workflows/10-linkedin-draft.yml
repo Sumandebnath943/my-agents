@@ -2,8 +2,15 @@
 name: LinkedIn Draft
 on:
   schedule:
-    - cron: "0 3 * * 1,3,5"   # Mon/Wed/Fri ~8:30 AM IST
+    - cron: "30 1 * * *"   # 7:00 AM IST daily — draft lands before the 9 AM posting window
   workflow_dispatch:
+    inputs:
+      edit_id:
+        description: "Post id to revise (leave blank for a fresh draft)"
+        required: false
+      edit_note:
+        description: "Edit instructions"
+        required: false
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -14,9 +21,12 @@ jobs:
       - run: npm ci
       - run: node agents/10-linkedin/10a-draft.js
         env:
+          EDIT_ID: ${{ github.event.inputs.edit_id }}
+          EDIT_NOTE: ${{ github.event.inputs.edit_note }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM: ${{ secrets.RESEND_FROM }}
-          MY_EMAIL: ${{ secrets.MY_EMAIL }}
