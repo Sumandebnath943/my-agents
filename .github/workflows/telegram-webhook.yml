@@ -1,0 +1,26 @@
+# .github/workflows/telegram-webhook.yml
+# Triggered by the dashboard webhook (workflow_dispatch) with one Telegram update to process.
+name: Telegram Webhook Handler
+on:
+  workflow_dispatch:
+    inputs:
+      update:
+        description: "Raw Telegram update JSON"
+        required: true
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/inbox-router/from-webhook.js
+        env:
+          TG_UPDATE: ${{ github.event.inputs.update }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
