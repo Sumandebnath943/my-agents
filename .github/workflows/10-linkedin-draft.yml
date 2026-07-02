@@ -2,7 +2,7 @@
 name: LinkedIn Draft
 on:
   schedule:
-    - cron: "30 1 * * *"   # 7:00 AM IST daily — draft lands before the 9 AM posting window
+    - cron: "30 1 * * *"   # 7:00 AM IST daily — curates the day's news list to pick from
   workflow_dispatch:
     inputs:
       edit_id:
@@ -10,6 +10,15 @@ on:
         required: false
       edit_note:
         description: "Edit instructions"
+        required: false
+      news_idx:
+        description: "Picked news index, or 'auto' (blank = curate today's list)"
+        required: false
+      batch_id:
+        description: "News batch id (staleness guard)"
+        required: false
+      regen_id:
+        description: "Post id to regenerate with a different angle"
         required: false
 jobs:
   run:
@@ -23,6 +32,9 @@ jobs:
         env:
           EDIT_ID: ${{ github.event.inputs.edit_id }}
           EDIT_NOTE: ${{ github.event.inputs.edit_note }}
+          NEWS_IDX: ${{ github.event.inputs.news_idx }}
+          BATCH_ID: ${{ github.event.inputs.batch_id }}
+          REGEN_ID: ${{ github.event.inputs.regen_id }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GH_PAT: ${{ secrets.GH_PAT }}

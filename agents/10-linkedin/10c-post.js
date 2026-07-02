@@ -44,7 +44,12 @@ if (!token?.access_token) {
 }
 const access = await freshToken(token);
 
-const commentary = (row.post + (row.hashtags ? `\n\n${row.hashtags}` : "")).trim();
+// LinkedIn's Posts API `commentary` uses the "Little Text" format: these characters are
+// reserved and MUST be backslash-escaped, otherwise LinkedIn silently DROPS everything from
+// the first unescaped one onward (the "post appears half" bug). Escape the body; leave the
+// appended hashtags unescaped so they stay clickable (`#Word` tokens have no reserved chars).
+const escapeLI = (s) => s.replace(/[\\<>~_*#@|(){}\[\]]/g, (c) => `\\${c}`);
+const commentary = (escapeLI(row.post) + (row.hashtags ? `\n\n${row.hashtags}` : "")).trim();
 const res = await fetch("https://api.linkedin.com/rest/posts", {
   method: "POST",
   headers: {
