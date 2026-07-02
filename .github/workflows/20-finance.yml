@@ -1,36 +1,27 @@
 # .github/workflows/20-finance.yml
+# Ingest is handled by the dashboard endpoint /api/finance-sms (MacroDroid POSTs there in
+# real time). This workflow only sends the weekly + monthly spend digests.
 name: Finance Ledger
 on:
   schedule:
-    - cron: "*/20 * * * *"    # ingest new SMS every 20 min
     - cron: "30 3 * * 0"      # weekly digest Sun (uses default = week)
     - cron: "30 3 1 * *"      # monthly digest on the 1st
   workflow_dispatch:
+    inputs:
+      period:
+        description: "week or month (manual digest)"
+        required: false
+        default: "week"
 jobs:
-  ingest:
-    if: github.event.schedule == '*/20 * * * *' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "22" }
-      - run: npm ci
-      - run: node agents/20-finance/index.js
-        env:
-          FINANCE_BOT_TOKEN: ${{ secrets.FINANCE_BOT_TOKEN }}
-          FINANCE_CHAT_ID: ${{ secrets.FINANCE_CHAT_ID }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
   weekly:
-    if: github.event.schedule == '30 3 * * 0'
+    if: github.event.schedule == '30 3 * * 0' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
       - run: npm ci
-      - run: node agents/20-finance/digest.js week
+      - run: node agents/20-finance/digest.js ${{ github.event.inputs.period || 'week' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
