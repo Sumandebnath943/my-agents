@@ -5,7 +5,7 @@
 // Claude Code prompt -> stores the pick (for the dashboard) + emails the call.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { subredditNew } from "../../lib/reddit.js";
+import { subredditsNew } from "../../lib/reddit.js";
 import { callGemini, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 
@@ -31,11 +31,9 @@ try {
   posts.push(...(Array.isArray(lob) ? lob : []).slice(0, 40).map((p) => ({ title: p.title || "", text: (p.description || "").slice(0, 300), url: p.short_id_url || p.url || "", source: "Lobsters" })));
 } catch {}
 
-// Reddit — the rawest demand signal. No-ops until REDDIT_CLIENT_ID/SECRET are set (see lib/reddit.js).
+// Reddit — the rawest demand signal — via RSS (no app/auth needed). One combined request.
 const SUBS = ["SaaS", "webdev", "SideProject", "indiehackers", "automation", "Entrepreneur", "startups", "nocode"];
-for (const s of SUBS) {
-  try { posts.push(...(await subredditNew(s, 25)).map((p) => ({ ...p, source: `r/${s}` }))); } catch {}
-}
+try { posts.push(...(await subredditsNew(SUBS, 60))); } catch {}
 
 posts = posts.filter((p) => p.title);
 if (!posts.length) { console.log("No demand posts fetched."); process.exit(0); }
