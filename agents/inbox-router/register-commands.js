@@ -19,6 +19,7 @@ commands.push(
   { command: "review", description: "Run the Weekly Founder Review now" },
   { command: "linkedin", description: "Generate a LinkedIn draft now" },
 );
+commands.push({ command: "spend", description: "Show recent spend by category" });
 commands.push({ command: "help", description: "List all commands" });
 
 const res = await fetch(
