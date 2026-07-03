@@ -1,8 +1,9 @@
 // agents/outreach-scout/index.js — Outreach Scout (#51 × #53).
-// Weekly. Finds opportunities you'd never stumble on — freelance/contract gigs, build collabs /
-// cofounder chats, and hackathons — from Reddit (RSS), HN's "Seeking freelancer?" thread, and
-// Devpost, then Groq screens to what actually fits you and drafts a specific, warm, non-cringe
-// intro for each. DRAFT-ONLY: it never sends anything to a human — you send the intro yourself.
+// Runs Mon + Thu and emails only NEW opportunities (opportunities expire, so we alert while fresh
+// and stay silent on empty runs). Finds freelance/contract gigs, build collabs / cofounder chats,
+// and hackathons — from Reddit (RSS), HN's "Seeking freelancer?" thread, and Devpost — then Groq
+// screens to what actually fits and drafts a specific, warm, non-cringe intro for each.
+// DRAFT-ONLY: it never sends anything to a human — you send the intro yourself.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { subredditsNew } from "../../lib/reddit.js";
@@ -59,23 +60,25 @@ let items = [];
 try { items = parseJson(picked).items || []; } catch {}
 if (!items.length) { console.log("No fits this week."); process.exit(0); }
 
-// Store (draft-only, status 'new'), deduped against what we've already surfaced.
-let added = 0;
+// Store (draft-only, status 'new'), deduped against what we've already surfaced. Keep only the NEW
+// ones for the alert — so twice-a-week runs never re-email opportunities you've already seen.
+const fresh = [];
 for (const it of items) {
   try {
     const { data } = await db.from("opportunities").select("id").eq("url", it.url).maybeSingle();
     if (data) continue;
     await db.from("opportunities").insert({ kind: it.kind, title: it.title, url: it.url, source: "scout", draft: it.draft });
-    added++;
+    fresh.push(it);
   } catch {}
 }
+if (!fresh.length) { console.log(`No NEW opportunities (screened ${items.length}, all already surfaced).`); process.exit(0); }
 
 const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const html = items.map((i) => `
+const html = fresh.map((i) => `
   <div style="margin-bottom:20px;border-left:3px solid #C6F24E;padding-left:12px">
     <h4>${esc(i.kind)} — ${esc(i.title)}</h4>
     <p><a href="${i.url}">${esc(i.url).slice(0, 70)}</a></p>
     <p><b>Draft intro (you send it):</b><br>${esc(i.draft).replace(/\n/g, "<br>")}</p>
   </div>`).join("<hr>");
-await notifyEmail(`🧭 ${items.length} opportunities + drafted intros`, `${html}<p style="color:#888">Draft-only — review and send yourself. Tracked on the dashboard.</p>`);
-console.log(`Found ${items.length}, ${added} new.`);
+await notifyEmail(`🧭 ${fresh.length} new opportunit${fresh.length === 1 ? "y" : "ies"} + drafted intros`, `${html}<p style="color:#888">Draft-only — review and send yourself. Tracked on the dashboard → Outreach.</p>`);
+console.log(`${fresh.length} new of ${items.length} screened.`);

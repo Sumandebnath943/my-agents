@@ -2,7 +2,7 @@
 name: Outreach Scout
 on:
   schedule:
-    - cron: "0 5 * * 1"    # Mondays ~10:30 IST
+    - cron: "0 5 * * 1,4"    # Mon + Thu ~10:30 IST (new-only alerts)
   workflow_dispatch:
 jobs:
   run:
