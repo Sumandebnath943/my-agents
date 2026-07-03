@@ -19,7 +19,7 @@ const ME = `Senior product marketer (9+ yrs) and AI-native builder who ships ful
 // 1) Reddit opportunity subs (RSS): [Hiring]/gig posts, cofounder & collab calls.
 const SUBS = ["forhire", "jobbit", "cofounder", "SideProject", "IndieDev"];
 let pool = [];
-try { pool.push(...(await subredditsNew(SUBS, 60))); } catch {}
+try { pool.push(...(await subredditsNew(SUBS, 60)).slice(0, 35)); } catch {} // cap Reddit so HN + Devpost aren't crowded out
 
 // 2) HN "Freelancer? Seeking freelancer?" — the SEEKING FREELANCER comments are companies hiring freelancers.
 try {
@@ -55,8 +55,8 @@ try {
     `You screen opportunities for me and draft outreach. Me: ${ME}
 From the list, keep ONLY genuinely relevant, legitimate, PAID opportunities. For each, return JSON {"items":[{"kind":"freelance|collab|cofounder|hackathon|bounty|grant","title":"short label","url":"","draft":"a specific, warm, non-generic 3-4 sentence intro I could send, referencing THIS specific post and tying it to my background"}]}. If nothing genuinely fits, return {"items":[]}. Never spammy, never generic, at most 8 items.
 
-OPPORTUNITIES:
-${JSON.stringify(pool.slice(0, 60))}`,
+OPPORTUNITIES (mix of Reddit gigs, HN "seeking freelancer" posts, and Devpost hackathons — consider all sources):
+${JSON.stringify(pool.slice(0, 90))}`,
     { json: true }
   );
   items = parseJson(picked).items || [];
