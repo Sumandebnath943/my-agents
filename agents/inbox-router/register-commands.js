@@ -20,6 +20,10 @@ commands.push(
   { command: "linkedin", description: "Generate a LinkedIn draft now" },
 );
 commands.push({ command: "spend", description: "Show recent spend by category" });
+commands.push({ command: "jobs", description: "Top new job matches" });
+commands.push({ command: "opps", description: "New outreach opportunities" });
+commands.push({ command: "skills", description: "Skills you're learning" });
+commands.push({ command: "build", description: "Top build-next candidates" });
 commands.push({ command: "help", description: "List all commands" });
 
 const res = await fetch(
