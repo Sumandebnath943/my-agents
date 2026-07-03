@@ -1,0 +1,28 @@
+# .github/workflows/48-launch-draft.yml
+name: Micro-Launch Draft
+on:
+  workflow_dispatch:
+    inputs:
+      owner:
+        description: "Repo owner"
+        required: true
+        default: "Sumandebnath943"
+      repo:
+        description: "Repo name to launch"
+        required: true
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/48-launch/index.js "${{ github.event.inputs.owner }}" "${{ github.event.inputs.repo }}"
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
