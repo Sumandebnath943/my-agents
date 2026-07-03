@@ -7,7 +7,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { subredditsNew } from "../../lib/reddit.js";
-import { callGroq, parseJson } from "../../lib/llm.js";
+import { callGemini, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
@@ -48,16 +48,19 @@ const seen = new Set();
 pool = pool.filter((p) => p.title && p.url && !seen.has(p.url) && seen.add(p.url));
 if (!pool.length) { console.log("No opportunities fetched."); process.exit(0); }
 
-// Groq screens for genuine fit + drafts a specific intro each.
-const picked = await callGroq(
-  [
-    { role: "system", content: `You screen opportunities for me and draft outreach. Me: ${ME}\nFrom the list, keep ONLY genuinely relevant, legitimate, paid ones. For each, return JSON {"items":[{"kind":"freelance|collab|cofounder|hackathon|bounty|grant","title":"short label","url":"","draft":"a specific, warm, non-generic 3-4 sentence intro I could send, referencing THIS specific post and tying it to my background"}]}. If nothing genuinely fits, return {"items":[]}. Never spammy, never generic, no more than 8 items.` },
-    { role: "user", content: JSON.stringify(pool.slice(0, 70)) },
-  ],
-  { json: true }
-);
+// Gemini screens for genuine fit + drafts a specific intro each (public data; big context).
 let items = [];
-try { items = parseJson(picked).items || []; } catch {}
+try {
+  const picked = await callGemini(
+    `You screen opportunities for me and draft outreach. Me: ${ME}
+From the list, keep ONLY genuinely relevant, legitimate, PAID opportunities. For each, return JSON {"items":[{"kind":"freelance|collab|cofounder|hackathon|bounty|grant","title":"short label","url":"","draft":"a specific, warm, non-generic 3-4 sentence intro I could send, referencing THIS specific post and tying it to my background"}]}. If nothing genuinely fits, return {"items":[]}. Never spammy, never generic, at most 8 items.
+
+OPPORTUNITIES:
+${JSON.stringify(pool.slice(0, 60))}`,
+    { json: true }
+  );
+  items = parseJson(picked).items || [];
+} catch (e) { console.error("screening failed:", e.message); process.exit(0); }
 if (!items.length) { console.log("No fits this week."); process.exit(0); }
 
 // Store (draft-only, status 'new'), deduped against what we've already surfaced. Keep only the NEW
