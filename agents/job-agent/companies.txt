@@ -1,0 +1,76 @@
+# Target companies for the Job Agent. One per line. Lines starting with # are ignored.
+# Add companies here, then run:  node agents/job-agent/resolve-slugs.js agents/job-agent/companies.txt
+# Paste the printed GREENHOUSE/LEVER/ASHBY arrays into config.js.
+OpenAI
+Anthropic
+Cohere
+Scale AI
+Perplexity
+Runway
+ElevenLabs
+Together AI
+Pinecone
+Databricks
+Harvey
+Sierra
+Cresta
+Writer
+Synthesia
+Descript
+Notion
+Figma
+Linear
+Ramp
+Brex
+Stripe
+Plaid
+Airtable
+Miro
+Vercel
+Netlify
+Zapier
+Amplitude
+Mixpanel
+Twilio
+Postman
+GitLab
+Confluent
+MongoDB
+Elastic
+Datadog
+Snowflake
+Calendly
+Webflow
+ClickUp
+Asana
+Dropbox
+Deel
+Remote
+Mercury
+Outreach
+Clari
+Lattice
+Culture Amp
+Pendo
+Intercom
+Reddit
+Discord
+Coinbase
+Instacart
+Pinterest
+Cloudflare
+Okta
+1Password
+Grafana Labs
+Sentry
+Algolia
+Contentful
+Sanity
+Zeta
+Atlan
+Mindtickle
+Groww
+CRED
+Meesho
+PhonePe
+Freshworks
