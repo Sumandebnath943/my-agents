@@ -21,6 +21,7 @@ export const SITES = [
   { name: "PentaCMD",           url: "https://sumandebnath.houseofnamus.com/slms/pentacmd" },
   { name: "Qdex",               url: "https://sumandebnath.houseofnamus.com/llms/qdex-1.5b" },
   { name: "Forget Anything",    url: "https://sumandebnath.houseofnamus.com/apps/forget-anything" },
+  { name: "Migi",               url: "https://migi.houseofnamus.com/" },
 ];
 
 export const SLOW_MS = 6000; // flag anything slower than 6s as "degraded" (fewer false yellows)

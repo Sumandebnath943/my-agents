@@ -13,7 +13,7 @@ import { callGemini, parseJson } from "../../lib/llm.js";
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const PAGES_PER_DAY = Number(process.env.BRAND_PAGES_PER_DAY || 12);
 const AUDITS_PER_DAY = Number(process.env.BRAND_AUDITS_PER_DAY || 10);
-const PER_SITE_CAP = Number(process.env.BRAND_PER_SITE_CAP || 40);
+const PER_SITE_CAP = Number(process.env.BRAND_PER_SITE_CAP || 100);
 
 async function pageSpeed(url) {
   const r = await fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&category=performance&category=seo&category=accessibility&key=${env("PAGESPEED_KEY")}`).then((x) => x.json());

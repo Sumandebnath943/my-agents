@@ -37,6 +37,6 @@ export const PROPERTIES = [
   { name: "ROASmind", url: "https://roasmind.houseofnamus.com/", tier: "perf" },
   { name: "Soul Canvas", url: "https://soulcanvas.houseofnamus.com/", tier: "perf" },
   { name: "Shraddha Portfolio", url: "https://shraddhasonel.houseofnamus.com/", tier: "perf" },
-  { name: "Migi", url: "https://migi.houseofnamus.com/", tier: "perf" },
+  { name: "Migi", url: "https://migi.houseofnamus.com/", tier: "perf", crawl: true },
   { name: "Crawl Daddy App", url: "https://crawldaddy--houseofnamus.replit.app/", tier: "perf" },
 ];

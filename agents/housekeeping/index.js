@@ -9,7 +9,7 @@ const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
 // table, timestamp column, and how long to keep (days).
 const TIERS = [
-  { table: "llm_metrics",     col: "ts",         days: 90 },   // high-volume telemetry
+  { table: "llm_metrics",     col: "ts",         days: 365 },  // keep 1 year for month-wise Team trends
   { table: "ops_events",      col: "ts",         days: 180 },
   { table: "agent_outputs",   col: "created_at", days: 180 },  // Responses feed
   { table: "finance",         col: "created_at", days: 730 },  // 24 months — financial history kept long
