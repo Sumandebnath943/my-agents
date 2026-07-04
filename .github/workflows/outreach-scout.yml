@@ -14,6 +14,7 @@ jobs:
       - run: npm ci
       - run: node agents/outreach-scout/index.js
         env:
+          AGENT_NAME: outreach-scout
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

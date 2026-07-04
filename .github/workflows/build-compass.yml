@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: node agents/build-compass/collect.js
         env:
+          AGENT_NAME: build-compass
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
   decide:
@@ -35,6 +36,7 @@ jobs:
       - run: npm ci
       - run: node agents/build-compass/decide.js
         env:
+          AGENT_NAME: build-compass
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

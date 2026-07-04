@@ -18,6 +18,7 @@ jobs:
       - run: npm ci
       - run: node agents/14-notes/index.js "${{ github.event.inputs.url }}"
         env:
+          AGENT_NAME: notes
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}

@@ -14,6 +14,7 @@ jobs:
       - run: npm ci
       - run: node agents/job-agent/index.js
         env:
+          AGENT_NAME: job-agent
           CV_TEXT: ${{ secrets.CV_TEXT }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

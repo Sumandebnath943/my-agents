@@ -20,6 +20,7 @@ jobs:
       - run: npm ci
       - run: node agents/48-launch/index.js "${{ github.event.inputs.owner }}" "${{ github.event.inputs.repo }}"
         env:
+          AGENT_NAME: launch
           GH_PAT: ${{ secrets.GH_PAT }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

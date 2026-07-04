@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: node agents/inbox-router/from-webhook.js
         env:
+          AGENT_NAME: migi
           TG_UPDATE: ${{ github.event.inputs.update }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

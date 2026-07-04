@@ -14,6 +14,7 @@ jobs:
       - run: npm ci
       - run: node agents/25-skillgap/index.js
         env:
+          AGENT_NAME: skillgap
           GH_PAT: ${{ secrets.GH_PAT }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

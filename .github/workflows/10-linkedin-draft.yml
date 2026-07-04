@@ -30,6 +30,7 @@ jobs:
       - run: npm ci
       - run: node agents/10-linkedin/10a-draft.js
         env:
+          AGENT_NAME: linkedin
           EDIT_ID: ${{ github.event.inputs.edit_id }}
           EDIT_NOTE: ${{ github.event.inputs.edit_note }}
           NEWS_IDX: ${{ github.event.inputs.news_idx }}

@@ -15,6 +15,7 @@ jobs:
       - run: npm ci
       - run: node agents/17-habits/weekly.js
         env:
+          AGENT_NAME: habits
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

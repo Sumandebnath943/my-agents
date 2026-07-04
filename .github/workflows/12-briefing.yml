@@ -14,6 +14,7 @@ jobs:
       - run: npm ci
       - run: node agents/12-briefing/index.js
         env:
+          AGENT_NAME: briefing
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}

@@ -23,6 +23,7 @@ jobs:
       - run: npm ci
       - run: node agents/20-finance/digest.js ${{ github.event.inputs.period || 'week' }}
         env:
+          AGENT_NAME: finance
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -39,6 +40,7 @@ jobs:
       - run: npm ci
       - run: node agents/20-finance/digest.js month
         env:
+          AGENT_NAME: finance
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}

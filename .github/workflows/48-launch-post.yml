@@ -13,6 +13,7 @@ jobs:
       - run: npm ci
       - run: node agents/48-launch/post-bsky.js
         env:
+          AGENT_NAME: launch
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

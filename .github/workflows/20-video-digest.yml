@@ -14,6 +14,7 @@ jobs:
       - run: npm ci
       - run: node agents/20-video-digest/index.js
         env:
+          AGENT_NAME: video-digest
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

@@ -14,6 +14,7 @@ jobs:
       - run: npm ci
       - run: node agents/05-deps/index.js
         env:
+          AGENT_NAME: deps
           GH_PAT: ${{ secrets.GH_PAT }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}

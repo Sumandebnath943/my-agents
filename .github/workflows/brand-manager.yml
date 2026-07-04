@@ -1,8 +1,8 @@
-# .github/workflows/15-journal-weekly.yml
-name: Journal Weekly Reflection
+# .github/workflows/brand-manager.yml
+name: Brand Manager
 on:
   schedule:
-    - cron: "30 3 * * 0"    # Sundays ~9:00 AM IST
+    - cron: "0 4 * * 1"   # Mondays ~9:30 AM IST, weekly
   workflow_dispatch:
 jobs:
   run:
@@ -12,12 +12,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
       - run: npm ci
-      - run: node agents/15-journal/weekly.js
+      - run: node agents/brand-manager/index.js
         env:
-          AGENT_NAME: journal
+          AGENT_NAME: brand-manager
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PAGESPEED_KEY: ${{ secrets.PAGESPEED_KEY }}
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
           MY_EMAIL: ${{ secrets.MY_EMAIL }}

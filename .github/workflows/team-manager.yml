@@ -1,0 +1,43 @@
+# .github/workflows/team-manager.yml
+# NOTE: env is written out per-job on purpose — GitHub Actions rejects YAML anchors
+# (&tm / *tm), the workflow silently won't run if you use them.
+name: Team Manager
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # provider health pings
+    - cron: "0 5 * * 1"      # weekly report, Monday ~10:30 AM IST
+  workflow_dispatch:
+jobs:
+  health:
+    if: github.event.schedule == '*/30 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/team-manager/health.js
+        env:
+          AGENT_NAME: team-manager
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  report:
+    if: github.event.schedule == '0 5 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/team-manager/index.js
+        env:
+          AGENT_NAME: team-manager
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}
