@@ -1,0 +1,21 @@
+# .github/workflows/housekeeping.yml
+name: Housekeeping
+on:
+  schedule:
+    - cron: "0 20 * * 0"   # Sunday ~1:30 AM IST (Mon) — weekly data prune
+  workflow_dispatch:
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/housekeeping/index.js
+        env:
+          AGENT_NAME: housekeeping
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
