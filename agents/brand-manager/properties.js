@@ -5,9 +5,10 @@
 //   perf = PageSpeed + SEO audit only (no per-site GSC/GA4 verification)
 // GA4 property IDs filled in: HoN = 517699679, Portfolio = 543022176 (shared by its path apps).
 export const PROPERTIES = [
-  { name: "HoN", url: "https://houseofnamus.com/", tier: "full",
+  // crawl:true -> discover ALL pages via sitemap (these are multi-page sites, not one page).
+  { name: "HoN", url: "https://houseofnamus.com/", tier: "full", crawl: true,
     gscSite: "sc-domain:houseofnamus.com", gscFilter: null, ga4Property: "properties/517699679" },
-  { name: "Portfolio", url: "https://sumandebnath.houseofnamus.com/", tier: "full",
+  { name: "Portfolio", url: "https://sumandebnath.houseofnamus.com/", tier: "full", crawl: true,
     gscSite: "https://sumandebnath.houseofnamus.com/", gscFilter: null, ga4Property: "properties/543022176" },
 
   // folder pages under the Portfolio -> same GSC/GA4, filtered by path

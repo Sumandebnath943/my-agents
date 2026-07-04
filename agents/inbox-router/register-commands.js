@@ -18,6 +18,9 @@ commands.push(
   { command: "expiry", description: "Run the Expiry Watcher now" },
   { command: "review", description: "Run the Weekly Founder Review now" },
   { command: "linkedin", description: "Generate a LinkedIn draft now" },
+  { command: "cto", description: "Run the CTO code-review patrol now" },
+  { command: "brand", description: "Run the Brand Manager report now" },
+  { command: "team", description: "Run the Team Manager fleet report now" },
 );
 commands.push({ command: "spend", description: "Show recent spend by category" });
 commands.push({ command: "jobs", description: "Top new job matches" });

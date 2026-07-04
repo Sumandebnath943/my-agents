@@ -1,25 +1,45 @@
 # .github/workflows/brand-manager.yml
+# Rolling design: a DAILY scan refreshes a few pages (budget-capped LLM), a WEEKLY job
+# compiles the report. workflow_dispatch (/brand) runs both. env written per job (no anchors).
 name: Brand Manager
 on:
   schedule:
-    - cron: "0 4 * * 1"   # Mondays ~9:30 AM IST, weekly
+    - cron: "0 1 * * *"   # daily ~6:30 AM IST — rolling page scan
+    - cron: "0 4 * * 1"   # Mon ~9:30 AM IST — weekly report
   workflow_dispatch:
 jobs:
-  run:
+  scan:
+    if: github.event.schedule == '0 1 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
       - run: npm ci
-      - run: node agents/brand-manager/index.js
+      - run: node agents/brand-manager/scan.js
         env:
           AGENT_NAME: brand-manager
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PAGESPEED_KEY: ${{ secrets.PAGESPEED_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+  report:
+    if: github.event.schedule == '0 4 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/brand-manager/report.js
+        env:
+          AGENT_NAME: brand-manager
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
           MY_EMAIL: ${{ secrets.MY_EMAIL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
