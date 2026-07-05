@@ -1,0 +1,30 @@
+# .github/workflows/mas.yml — MAS SLOW PLANE (heavy missions). MANUAL-ONLY (workflow_dispatch)
+# — NO cron, so it never adds a scheduled job. Dispatched by the Vercel orchestrator with a
+# mission_id. Uses the SEPARATE MAS LLM keys (mapped onto the standard env names so lib/llm.js
+# uses them) and delivers ONLY to the MAS bot. Isolated from every other agent.
+name: MAS Slow Plane
+on:
+  workflow_dispatch:
+    inputs:
+      mission_id:
+        description: MAS mission id
+        required: true
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/mas/run.js
+        env:
+          MISSION_ID: ${{ github.event.inputs.mission_id }}
+          AGENT_NAME: mas
+          GROQ_API_KEY: ${{ secrets.MAS_GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.MAS_GEMINI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          MAS_BOT_TOKEN: ${{ secrets.MAS_BOT_TOKEN }}
+          MAS_CHAT_ID: ${{ secrets.MAS_CHAT_ID }}
+          CV_TEXT: ${{ secrets.CV_TEXT }}
