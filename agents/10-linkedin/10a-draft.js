@@ -10,12 +10,13 @@
 // A repetition guard (last ~14 days of drafts) keeps topics + openers from repeating.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { callGemini, callGroq, parseJson } from "../../lib/llm.js";
+import { callGroq, geminiThenGroq, parseJson } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { PROFILE, profileContext } from "../../lib/profile.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { AI_FEEDS } from "./sources.js";
 import { WRITING_PLAYBOOK, VALUE_BAR } from "./voice.js";
+import { trendingHashtags } from "../../lib/hashtags.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const OWNER = "Sumandebnath943";
@@ -100,22 +101,13 @@ async function safetyReview(post) {
   }
 }
 
-async function researchHashtags(topic) {
-  try {
-    const out = await callGroq(
-      [{ role: "user", content: `Search the web for 3 currently relevant, well-performing LinkedIn hashtags for a post about "${topic}" aimed at founders, AI builders, and marketers. Return ONLY the 3 hashtags, space-separated, each starting with #. No other text.` }],
-      { model: "groq/compound" }
-    );
-    const tags = (out.match(/#[A-Za-z0-9]+/g) || []).slice(0, 3);
-    return tags.join(" ");
-  } catch { return ""; }
-}
+// Hashtags now come from the shared, robust engine (lib/hashtags.js) — never empty.
 
 // Core generation — grounds a chosen news item to the real Suman and writes the post.
 // regenOf: update that existing row instead of inserting. previousPost: force a new angle.
 async function writePost(item, { regenOf = null, previousPost = null } = {}) {
   const [portfolio, work, recents] = await Promise.all([stripFetch(PORTFOLIO_URL), recentWork(), recentPosts()]);
-  const out = await callGemini(
+  const out = await geminiThenGroq(
     `You are ghostwriting a LinkedIn post in MY voice to position me as an ${PROFILE.positioning}.
 ${profileContext()}
 
@@ -148,7 +140,7 @@ Return ONLY JSON {"post":"the full post, formatted with real line breaks","groun
   try { o = parseJson(out); } catch { o = {}; }
   if (!o.post) { await notifyTelegram("🤔 Couldn't draft that one — try another news item or /linkedin again.", { html: true }); return; }
 
-  const hashtags = await researchHashtags(item.headline || "AI");
+  const hashtags = (await trendingHashtags(item.headline || "AI", { platform: "linkedin", count: 3 })).join(" ");
   const review = await safetyReview(o.post);
   if (review.hard) { await notifyTelegram(`🛑 Draft blocked by the safety filter (${review.reasons.join(", ")}). Not sent.`, { html: true }); return; }
   const warning = review.safe ? null : review.reasons.join("; ");
@@ -172,7 +164,7 @@ if (process.env.EDIT_ID) {
   const note = process.env.EDIT_NOTE || "";
   const { data: row } = await db.from("linkedin_posts").select("*").eq("id", id).maybeSingle();
   if (!row) { console.log("edit: post not found", id); process.exit(0); }
-  const out = await callGemini(
+  const out = await geminiThenGroq(
     `Revise my LinkedIn post per my instructions, keeping it grounded, in my voice, and within the rules.
 Apply my instructions but keep the post true to the writing playbook (hook, cadence, one concrete value, punchy close).
 
@@ -222,7 +214,7 @@ if (process.env.NEWS_IDX) {
   let item;
   if (idx === "auto") {
     try {
-      const pick = await callGemini(
+      const pick = await geminiThenGroq(
         `From this shortlist of today's AI news, pick the SINGLE best one for me to post about as ${PROFILE.positioning} (audience: ${PROFILE.audience}). Consider relevance and how well it connects to my work.\n${batch.items.map((it, i) => `${i}. ${it.headline} — ${it.why || ""}`).join("\n")}\nReturn ONLY JSON {"i":<index>}.`,
         { json: true }
       );
@@ -252,7 +244,7 @@ const headlines = raw.filter((a) => { const k = a.title.toLowerCase(); if (seen.
 if (!headlines.length) { console.log("No headlines fetched."); process.exit(0); }
 
 const recents = await recentPosts();
-const curated = await callGemini(
+const curated = await geminiThenGroq(
   `You are my editorial assistant. From today's AI headlines, choose the TOP 7 most worth a LinkedIn post for me — ${PROFILE.positioning} — whose audience is ${PROFILE.audience}.
 Prefer substantive developments (new models, tools, agentic/AI-product shifts, notable research) over PR fluff, funding-round noise, and clickbait. Favour freshness and relevance to my work. AVOID topics I've already posted about recently.
 

@@ -74,6 +74,14 @@ if (res.ok || res.status === 201) {
   await db.from("linkedin_posts").update({ status: "posted", post_url: postUrl, updated_at: new Date().toISOString() }).eq("id", postId);
   await notifyTelegram(`✅ <b>Posted to LinkedIn</b>${postUrl ? `\n${tgEscape(postUrl)}` : ""}`, { html: true });
   await notifyEmail("✅ Your LinkedIn post is live", `<p>Published:</p><pre>${commentary.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>${postUrl ? `<p><a href="${postUrl}">View on LinkedIn</a></p>` : ""}`);
+  // Offer to repurpose the same content to the free socials (handled in-process by the webhook).
+  await notifyTelegram("♻️ <b>Repurpose this?</b> Shorten &amp; post it to your other socials, or pick different news.", {
+    html: true,
+    buttons: [
+      [{ text: "🦋 Bluesky", callback_data: `soc:rp:bluesky:${postId}` }, { text: "🐘 Mastodon", callback_data: `soc:rp:mastodon:${postId}` }],
+      [{ text: "🌐 Both", callback_data: `soc:rp:both:${postId}` }, { text: "🆕 Different news", callback_data: "soc:new" }],
+    ],
+  });
   console.log("Posted.", postUrl);
 } else {
   const err = await res.text();
