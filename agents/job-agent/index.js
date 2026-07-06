@@ -11,6 +11,7 @@ import { TITLES, LOCATIONS, MIN_FIT, GREENHOUSE, LEVER, ASHBY } from "./config.j
 import { greenhouse, lever, ashby, remoteBoards } from "./ats.js";
 import { callGemini, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
+import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
@@ -65,13 +66,19 @@ if (!results.length) { console.log("New roles found but none above fit threshold
 // 5) One email packet, best fit first — each with a direct apply link + cover letter.
 results.sort((a, b) => b.fit - a.fit);
 const esc = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const html = results.map((r) => `
-  <div style="margin-bottom:24px">
-    <h3>${r.fit}% — ${esc(r.title)} @ ${esc(r.company)}</h3>
-    <p>${esc(r.location)} · <a href="${r.apply_url}">Apply here →</a></p>
-    <p><b>Why:</b> ${esc(r.reasons)}</p>
-    <p><b>Emphasize:</b> ${esc(r.emphasize)}</p>
-    <details><summary>Tailored cover letter</summary><pre style="white-space:pre-wrap;font-family:ui-monospace,monospace">${esc(r.cover_letter)}</pre></details>
-  </div>`).join("<hr>");
-await notifyEmail(`💼 ${results.length} apply-ready role(s) — best ${results[0].fit}%`, html);
+const blocks = [
+  { type: "tiles", items: [
+    { ramp: "green", label: "New roles", value: String(results.length) },
+    { ramp: "green", label: "Best fit", value: `${results[0].fit}%` },
+  ] },
+];
+for (const r of results) {
+  blocks.push({ type: "hero", ramp: r.fit >= 80 ? "green" : r.fit >= 65 ? "amber" : "gray", kicker: `${r.fit}% FIT`, title: `${r.title} @ ${r.company}`, note: `${r.location || "—"}${r.reasons ? ` · ${r.reasons}` : ""}`, buttonLabel: "Apply →", link: r.apply_url || r.url });
+  blocks.push({ type: "text", html: `<b>Emphasize:</b> ${esc(r.emphasize)}<br><br><b>Tailored cover letter</b><br>${mdToHtml(r.cover_letter)}` });
+  blocks.push({ type: "divider" });
+}
+await notifyEmail(`💼 ${results.length} apply-ready role(s) — best ${results[0].fit}%`, renderEmail({
+  title: "Apply-Ready Roles", subtitle: `${results.length} new · best fit ${results[0].fit}%`, kicker: "JOB AGENT", accent: "#0F6E56",
+  blocks, footer: "Job Agent · apply from the links; track your pipeline on the dashboard → Jobs",
+}));
 console.log(`Surfaced ${results.length} roles.`);

@@ -17,6 +17,7 @@ import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { AI_FEEDS } from "./sources.js";
 import { WRITING_PLAYBOOK, VALUE_BAR } from "./voice.js";
 import { trendingHashtags } from "../../lib/hashtags.js";
+import { stripMarkdown } from "../../lib/email-template.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const OWNER = "Sumandebnath943";
@@ -29,7 +30,8 @@ const GUARDRAILS = `HARD RULES (must all hold):
 - NEVER include secrets, API keys, tokens, emails, phone numbers, or private URLs.
 - NO politics, religion, divisive/sentiment-hurting takes, piracy, illegal or dangerous content.
 - NO fabricated metrics or invented personal anecdotes. Only claim things grounded in my portfolio/commits/beliefs; otherwise write as analysis/opinion.
-- At most 1 emoji, no hashtag spam, no cringe (hashtags are added separately — do not write any).`;
+- At most 1 emoji, no hashtag spam, no cringe (hashtags are added separately — do not write any).
+- Plain text only — NO markdown (no **, __, ##, backticks, or bullet syntax); LinkedIn shows those characters literally.`;
 
 // Deterministic secret/PII scan — a hard block that doesn't rely on the model.
 const SECRET_RE = /(gsk_[A-Za-z0-9]{6,}|re_[A-Za-z0-9]{6,}|AIza[0-9A-Za-z_-]{10,}|sk-[A-Za-z0-9]{10,}|eyJ[A-Za-z0-9_-]{10,}|xox[baprs]-|Bearer\s+[A-Za-z0-9._-]{12,}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}|\b\d{10}\b|[a-z0-9]+\.supabase\.co)/i;
@@ -139,6 +141,7 @@ Return ONLY JSON {"post":"the full post, formatted with real line breaks","groun
   let o = {};
   try { o = parseJson(out); } catch { o = {}; }
   if (!o.post) { await notifyTelegram("🤔 Couldn't draft that one — try another news item or /linkedin again.", { html: true }); return; }
+  o.post = stripMarkdown(o.post); // LinkedIn renders markdown literally — keep it plain text
 
   const hashtags = (await trendingHashtags(item.headline || "AI", { platform: "linkedin", count: 3 })).join(" ");
   const review = await safetyReview(o.post);
@@ -180,7 +183,7 @@ ${row.post}
 Return ONLY JSON {"post":"revised post text, formatted with real line breaks"}.`,
     { json: true }
   );
-  let revised = row.post; try { revised = parseJson(out).post || row.post; } catch {}
+  let revised = row.post; try { revised = stripMarkdown(parseJson(out).post || row.post); } catch {}
   const review = await safetyReview(revised);
   if (review.hard) { await notifyTelegram(`🛑 Revised draft blocked by the safety filter (${review.reasons.join(", ")}). Not sent.`, { html: true }); process.exit(0); }
   const warning = review.safe ? null : review.reasons.join("; ");

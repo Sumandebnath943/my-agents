@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callGroq } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
+import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const since = new Date(Date.now() - 7 * 864e5).toISOString();
@@ -50,6 +51,28 @@ const narrative = await callGroq([
   { role: "user", content: JSON.stringify({ byProvider, byAgent, ops: opsSummary }) },
 ]);
 
-await notifyEmail("🛠️ Team Manager — weekly fleet report",
-  `<pre style="white-space:pre-wrap">${narrative}</pre><hr><h4>By provider</h4><pre>${JSON.stringify(byProvider, null, 2)}</pre><h4>By agent</h4><pre>${JSON.stringify(byAgent, null, 2)}</pre><h4>Ops events</h4><pre>${JSON.stringify(opsSummary, null, 2)}</pre>`);
+const tokFmt = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
+const tot = rows.reduce((a, r) => ({ calls: a.calls + 1, ok: a.ok + (r.ok ? 1 : 0), tokens: a.tokens + (r.in_tokens || 0) + (r.out_tokens || 0), cost: a.cost + Number(r.est_cost_usd || 0) }), { calls: 0, ok: 0, tokens: 0, cost: 0 });
+const provItems = Object.entries(byProvider).map(([k, v]) => ({ title: k, note: `${v.calls} calls · ${v.success} ok · $${v.cost_usd} · ${v.avg_ms}ms avg${v.rate_limits ? ` · ${v.rate_limits} rate-limits` : ""}${v.outages ? ` · ${v.outages} outages` : ""}` }));
+const agentItems = Object.entries(byAgent).sort((a, b) => b[1].calls - a[1].calls).slice(0, 12).map(([k, v]) => ({ title: k, note: `${v.calls} calls · ${v.success} ok · $${v.cost_usd} · ${tokFmt(v.tokens)} tokens` }));
+const opsNote = opsSummary.email_failures || opsSummary.rate_limit_warnings
+  ? `⚠️ ${opsSummary.email_failures} email failure(s) · ${opsSummary.rate_limit_warnings} rate-limit warning(s)${opsSummary.agents_hitting_limits.length ? ` (${opsSummary.agents_hitting_limits.join(", ")})` : ""}`
+  : "No ops incidents this week. ✅";
+
+await notifyEmail("🛠️ Team Manager — weekly fleet report", renderEmail({
+  title: "Team Manager — fleet report", kicker: "WEEKLY LLM OPS", accent: "#BA7517",
+  blocks: [
+    { type: "tiles", items: [
+      { ramp: "amber", label: "Calls", value: String(tot.calls) },
+      { ramp: "amber", label: "Cost", value: `$${tot.cost.toFixed(2)}` },
+      { ramp: "amber", label: "Tokens", value: tokFmt(tot.tokens) },
+      { ramp: "green", label: "Success", value: `${tot.calls ? Math.round((tot.ok / tot.calls) * 1000) / 10 : 100}%` },
+    ] },
+    { type: "text", html: mdToHtml(narrative) },
+    { type: "stat", text: opsNote },
+    { type: "listSection", ramp: "blue", heading: "BY PROVIDER", items: provItems },
+    { type: "listSection", ramp: "amber", heading: "BY AGENT", items: agentItems },
+  ],
+  footer: "Team Manager · llm_metrics, last 7 days",
+}));
 console.log(narrative);

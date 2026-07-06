@@ -8,6 +8,7 @@ import { PROPERTIES } from "./properties.js";
 import { googleToken } from "../../lib/google-auth.js";
 import { callGemini } from "../../lib/llm.js";
 import { notifyEmail, notifyTelegram, tgEscape } from "../../lib/notify.js";
+import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const week = new Date().toISOString().slice(0, 10);
@@ -84,10 +85,23 @@ const report = await callGemini(
 4) Top 3 prioritized actions across everything.
 Be specific, use the numbers, no fluff. DATA:\n${JSON.stringify(compact)}`);
 
-await notifyEmail(`📊 Weekly brand report — ${week}`, `<pre style="white-space:pre-wrap">${report}</pre>`);
-
 const totalPages = results.reduce((s, r) => s + r.pages, 0);
 const regr = results.filter((r) => r._regressions.length);
+const brokenTotal = results.reduce((s, r) => s + (r.broken_links || 0), 0);
+
+await notifyEmail(`📊 Weekly brand report — ${week}`, renderEmail({
+  title: "Weekly Brand Report", subtitle: week, kicker: "BRAND & SEO", accent: "#185FA5",
+  blocks: [
+    { type: "tiles", items: [
+      { ramp: "blue", label: "Properties", value: String(results.length) },
+      { ramp: "blue", label: "Pages tracked", value: String(totalPages) },
+      { ramp: regr.length ? "red" : "green", label: "Regressions", value: String(regr.length) },
+      { ramp: brokenTotal ? "amber" : "green", label: "Broken links", value: String(brokenTotal) },
+    ] },
+    { type: "text", html: mdToHtml(report) },
+  ],
+  footer: "Brand Manager · weekly rollup across your web properties",
+}));
 let tg = `📊 <b>Brand report — ${week}</b>\n${results.length} properties · ${totalPages} pages tracked\nEmailed the full breakdown.`;
 if (regr.length) tg += `\n⚠️ Regressions: ${tgEscape(regr.map((r) => r.name).join(", "))}`;
 await notifyTelegram(tg, { html: true });

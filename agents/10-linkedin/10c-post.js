@@ -5,6 +5,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { notifyEmail, notifyTelegram, tgEscape } from "../../lib/notify.js";
+import { renderEmail, stripMarkdown } from "../../lib/email-template.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
@@ -49,7 +50,10 @@ const access = await freshToken(token);
 // the first unescaped one onward (the "post appears half" bug). Escape the body; leave the
 // appended hashtags unescaped so they stay clickable (`#Word` tokens have no reserved chars).
 const escapeLI = (s) => s.replace(/[\\<>~_*#@|(){}\[\]]/g, (c) => `\\${c}`);
-const commentary = (escapeLI(row.post) + (row.hashtags ? `\n\n${row.hashtags}` : "")).trim();
+// Strip any markdown FIRST — LinkedIn shows literal `**`/`#` otherwise (the reserved chars get
+// backslash-escaped and render as text). Hashtags are appended separately (kept clickable).
+const cleanPost = stripMarkdown(row.post);
+const commentary = (escapeLI(cleanPost) + (row.hashtags ? `\n\n${row.hashtags}` : "")).trim();
 const res = await fetch("https://api.linkedin.com/rest/posts", {
   method: "POST",
   headers: {
@@ -73,7 +77,14 @@ if (res.ok || res.status === 201) {
   const postUrl = urn ? `https://www.linkedin.com/feed/update/${urn}` : "";
   await db.from("linkedin_posts").update({ status: "posted", post_url: postUrl, updated_at: new Date().toISOString() }).eq("id", postId);
   await notifyTelegram(`✅ <b>Posted to LinkedIn</b>${postUrl ? `\n${tgEscape(postUrl)}` : ""}`, { html: true });
-  await notifyEmail("✅ Your LinkedIn post is live", `<p>Published:</p><pre>${commentary.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>${postUrl ? `<p><a href="${postUrl}">View on LinkedIn</a></p>` : ""}`);
+  await notifyEmail("✅ Your LinkedIn post is live", renderEmail({
+    title: "Your LinkedIn post is live", kicker: "PUBLISHED", accent: "#0A66C2",
+    blocks: [
+      { type: "text", html: cleanPost.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/\n/g, "<br>") + (row.hashtags ? `<br><br><span style="color:#0A66C2;font-weight:600;">${row.hashtags}</span>` : "") },
+      ...(postUrl ? [{ type: "hero", ramp: "blue", title: "View it on LinkedIn", buttonLabel: "Open post →", link: postUrl }] : []),
+    ],
+    footer: "LinkedIn autopilot",
+  }));
   // Offer to repurpose the same content to the free socials (handled in-process by the webhook).
   await notifyTelegram("♻️ <b>Repurpose this?</b> Shorten &amp; post it to your other socials, or pick different news.", {
     html: true,
