@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callGroq } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
+import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
 const period = process.argv[2] === "month" ? 30 : 7;
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
@@ -18,10 +19,21 @@ const summary = await callGroq([
   { role: "user", content: JSON.stringify(data.map((d) => ({ merchant: d.merchant, amount: d.amount }))) },
 ]);
 
-await notifyEmail(
-  `💸 Spend (${period}d): ₹${total.toFixed(0)}`,
-  `<h3 style="font-family:system-ui,sans-serif">Spend — last ${period} days</h3>
-   <p style="font-family:system-ui,sans-serif">Total debits: <b>₹${total.toFixed(0)}</b> across ${data.length} transactions.</p>
-   <pre style="white-space:pre-wrap;font-family:ui-monospace,monospace;background:#f6f6f4;padding:14px;border-radius:10px">${String(summary).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre>`
-);
+const byCat = {};
+for (const r of data) byCat[r.category || "other"] = (byCat[r.category || "other"] || 0) + Number(r.amount || 0);
+const inr = (n) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+const catItems = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => ({ title: c, note: inr(v) }));
+
+await notifyEmail(`💸 Spend (${period}d): ₹${total.toFixed(0)}`, renderEmail({
+  title: `Spend — last ${period} days`, kicker: "FINANCE", accent: "#0F6E56",
+  blocks: [
+    { type: "tiles", items: [
+      { ramp: "teal", solid: true, span: "half", label: "Total spent", value: inr(total) },
+      { ramp: "teal", span: "half", label: "Transactions", value: String(data.length) },
+    ] },
+    { type: "listSection", ramp: "teal", heading: "BY CATEGORY", items: catItems },
+    { type: "text", html: mdToHtml(summary) },
+  ],
+  footer: "Finance · your SMS/notification ledger",
+}));
 console.log(`Digest sent: ₹${total.toFixed(0)} over ${period}d.`);
