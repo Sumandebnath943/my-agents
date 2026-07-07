@@ -1,0 +1,17 @@
+[
+  { "id": "photo->expense",            "msg": { "text": "", "photoFileId": "AgACAgUAx1" }, "expect": "expense" },
+  { "id": "photo-with-caption",        "msg": { "text": "lunch", "photoFileId": "abc123" }, "expect": "expense" },
+  { "id": "/notes url",                "msg": { "text": "/notes https://youtu.be/x" },       "expect": "command" },
+  { "id": "/idea text",                "msg": { "text": "/idea a tiny CRM for founders" },    "expect": "command" },
+  { "id": "/expenses month",           "msg": { "text": "/expenses month" },                 "expect": "command" },
+  { "id": "/habits 14",                "msg": { "text": "/habits 14" },                       "expect": "command" },
+  { "id": "unknown-slash-still-cmd",   "msg": { "text": "/frobnicate" },                     "expect": "command" },
+  { "id": "bare-url->readlater",       "msg": { "text": "read this https://example.com/a" },  "expect": "readlater" },
+  { "id": "http-url->readlater",       "msg": { "text": "http://plainsite.org" },             "expect": "readlater" },
+  { "id": "habit-log-slept",           "msg": { "text": "slept 2:30 woke 9 productivity 4 gym yes" }, "expect": "habit" },
+  { "id": "habit-log-productivity",    "msg": { "text": "productivity was a solid 5 today, no gym though" }, "expect": "habit" },
+  { "id": "journal-prose",            "msg": { "text": "Today was a long reflective day, lots of progress on the launch plan" }, "expect": "journal" },
+  { "id": "journal-no-habit-trigger", "msg": { "text": "went to the gym and read a book" }, "expect": "journal" },
+  { "id": "short-text->skip",          "msg": { "text": "ok" },                               "expect": "skip" },
+  { "id": "empty->skip",               "msg": { "text": "" },                                 "expect": "skip" }
+]

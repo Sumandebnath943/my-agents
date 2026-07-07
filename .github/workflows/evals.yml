@@ -1,0 +1,23 @@
+# .github/workflows/evals.yml
+# Offline regression gate for the fleet's pure logic (routing, JSON parsing, social markdown-strip).
+# No secrets, no network — safe to run on every PR. Finance classifier evals live in the dashboard repo.
+name: Evals
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: evals-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: npm run check
+      - run: npm run eval:all

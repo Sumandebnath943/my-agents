@@ -3,9 +3,10 @@
 // Reuses the exact same handlers as the polling router — no duplication.
 import { handleReadLater } from "../13-readlater/handle.js";
 import { handleExpense } from "../16-expenses/handle.js";
-import { handleHabit, isHabitLog } from "../17-habits/handle.js";
+import { handleHabit } from "../17-habits/handle.js";
 import { handleJournal } from "../15-journal/handle.js";
 import { runCommand } from "./commands.js";
+import { classifyRoute } from "./route.js";
 
 const raw = process.env.TG_UPDATE;
 if (!raw) { console.log("No TG_UPDATE."); process.exit(0); }
@@ -24,18 +25,13 @@ const msg = {
 };
 
 try {
-  if (msg.photoFileId) {
-    await handleExpense(msg); console.log("routed: expense");
-  } else if (msg.text.trim().startsWith("/")) {
-    await runCommand(msg.text); console.log("routed: command", msg.text.slice(0, 40));
-  } else if (/https?:\/\//.test(msg.text)) {
-    const n = await handleReadLater(msg); console.log(`routed: readlater (${n})`);
-  } else if (isHabitLog(msg.text)) {
-    await handleHabit(msg); console.log("routed: habit");
-  } else if (msg.text && msg.text.length >= 10) {
-    await handleJournal(msg); console.log("routed: journal");
-  } else {
-    console.log("skipped:", msg.text?.slice(0, 40));
+  switch (classifyRoute(msg)) {
+    case "expense":   await handleExpense(msg); console.log("routed: expense"); break;
+    case "command":   await runCommand(msg.text); console.log("routed: command", msg.text.slice(0, 40)); break;
+    case "readlater": console.log(`routed: readlater (${await handleReadLater(msg)})`); break;
+    case "habit":     await handleHabit(msg); console.log("routed: habit"); break;
+    case "journal":   await handleJournal(msg); console.log("routed: journal"); break;
+    default:          console.log("skipped:", msg.text?.slice(0, 40));
   }
 } catch (e) {
   console.error("handler failed:", e.message);

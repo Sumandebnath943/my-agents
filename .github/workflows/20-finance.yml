@@ -12,10 +12,16 @@ on:
         description: "week or month (manual digest)"
         required: false
         default: "week"
+permissions:
+  contents: read
+concurrency:
+  group: 20-finance-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   weekly:
     if: github.event.schedule == '30 3 * * 0' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,6 +39,7 @@ jobs:
   monthly:
     if: github.event.schedule == '30 3 1 * *'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -8,15 +8,27 @@ import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
+// Constrain Gemini's output to exactly this shape (category is a fixed enum) — no more
+// "wrong field / stray prose / bad category" parse failures from the vision model.
+const EXPENSE_SCHEMA = {
+  type: "object",
+  properties: {
+    merchant: { type: "string" },
+    amount: { type: "number" },
+    currency: { type: "string" },
+    category: { type: "string", enum: ["food", "transport", "shopping", "bills", "other"] },
+    spent_on: { type: "string", description: "YYYY-MM-DD" },
+  },
+  required: ["merchant", "amount", "currency", "category", "spent_on"],
+};
+
 export async function handleExpense(msg) {
   if (!msg.photoFileId) return false; // only act on photos
   const base64 = await downloadFileBase64(msg.photoFileId);
 
   const out = await callGemini(
-    `Extract the expense from this receipt photo. Return ONLY JSON:
-{"merchant":"...","amount":12.34,"currency":"INR","category":"food|transport|shopping|bills|other","spent_on":"YYYY-MM-DD"}.
-If a field is unreadable, use your best guess.`,
-    { json: true, images: [{ mimeType: "image/jpeg", base64 }] }
+    `Extract the expense from this receipt photo. Fill every field; if one is unreadable, use your best guess.`,
+    { schema: EXPENSE_SCHEMA, images: [{ mimeType: "image/jpeg", base64 }] }
   );
   const e = parseJson(out);
   await db.from("expenses").insert({

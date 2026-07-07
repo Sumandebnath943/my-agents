@@ -4,9 +4,15 @@ on:
   schedule:
     - cron: "30 15 * * *"   # 9:00 PM IST daily
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 20-video-digest-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

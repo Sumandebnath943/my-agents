@@ -4,9 +4,15 @@ on:
   schedule:
     - cron: "0 20 * * 0"   # Sunday ~1:30 AM IST (Mon) — weekly data prune
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: housekeeping-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   prune:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

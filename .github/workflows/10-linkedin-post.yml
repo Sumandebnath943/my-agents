@@ -7,9 +7,15 @@ on:
       post_id:
         description: "linkedin_posts id to publish"
         required: true
+permissions:
+  contents: read
+concurrency:
+  group: 10-linkedin-post-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

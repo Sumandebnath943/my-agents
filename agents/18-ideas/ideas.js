@@ -7,12 +7,33 @@ import { callGemini, parseJson } from "../../lib/llm.js";
 let _db;
 const db = () => (_db ||= createClient(env("SUPABASE_URL"), env("SUPABASE_KEY")));
 
+// Constrain the spec shape so scoring (impact*feasibility) and the stored `spec` JSON are always
+// well-formed — the model can't drop a field or return ratings as strings.
+const IDEA_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string", description: "short name" },
+    spec: {
+      type: "object",
+      properties: {
+        problem: { type: "string" },
+        users: { type: "string" },
+        core_features: { type: "array", items: { type: "string" } },
+        free_stack: { type: "array", items: { type: "string" }, description: "tools that are free, no self-host" },
+        claude_code_prompt: { type: "string", description: "a copy-paste prompt to start building it" },
+      },
+      required: ["problem", "users", "core_features", "free_stack", "claude_code_prompt"],
+    },
+    impact: { type: "integer", description: "1-5" },
+    feasibility: { type: "integer", description: "1-5" },
+  },
+  required: ["title", "spec", "impact", "feasibility"],
+};
+
 export async function addIdea(idea) {
   const out = await callGemini(
-    `Expand this app/agent idea into a tight spec. Return ONLY JSON:
-{"title":"short name","spec":{"problem":"","users":"","core_features":["",""],"free_stack":["tools that are free, no self-host"],"claude_code_prompt":"a copy-paste prompt to start building it"},"impact":1-5,"feasibility":1-5}.
-Idea: ${idea}`,
-    { json: true }
+    `Expand this app/agent idea into a tight spec. Idea: ${idea}`,
+    { schema: IDEA_SCHEMA }
   );
   const o = parseJson(out);
   const score = (o.impact || 3) * (o.feasibility || 3);

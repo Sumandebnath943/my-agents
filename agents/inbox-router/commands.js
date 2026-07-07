@@ -12,7 +12,7 @@ import { addIdea, listIdeas } from "../18-ideas/ideas.js";
 let _db;
 const db = () => (_db ||= createClient(env("SUPABASE_URL"), env("SUPABASE_KEY")));
 
-function windowDays(args, fallback = 7) {
+export function windowDays(args, fallback = 7) {
   const s = args.join(" ").toLowerCase();
   if (s.includes("today")) return 1;
   if (s.includes("week")) return 7;

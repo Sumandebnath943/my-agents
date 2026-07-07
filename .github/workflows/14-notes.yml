@@ -8,9 +8,15 @@ on:
         description: "YouTube video or article URL to turn into notes"
         required: true
         type: string
+permissions:
+  contents: read
+concurrency:
+  group: 14-notes-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

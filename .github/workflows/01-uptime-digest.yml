@@ -5,9 +5,15 @@ on:
   schedule:
     - cron: "30 2 * * *"   # 8:00 AM IST daily
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 01-uptime-digest-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -9,9 +9,15 @@ on:
       mission_id:
         description: MAS mission id
         required: true
+permissions:
+  contents: read
+concurrency:
+  group: mas-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

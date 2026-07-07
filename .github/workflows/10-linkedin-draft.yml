@@ -20,9 +20,15 @@ on:
       regen_id:
         description: "Post id to regenerate with a different angle"
         required: false
+permissions:
+  contents: read
+concurrency:
+  group: 10-linkedin-draft-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -7,10 +7,16 @@ on:
     - cron: "*/30 * * * *"   # provider health pings
     - cron: "0 5 * * 1"      # weekly report, Monday ~10:30 AM IST
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: team-manager-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   health:
     if: github.event.schedule == '*/30 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,6 +32,7 @@ jobs:
   report:
     if: github.event.schedule == '0 5 * * 1' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

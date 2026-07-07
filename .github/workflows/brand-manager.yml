@@ -7,10 +7,16 @@ on:
     - cron: "0 1 * * *"   # daily ~6:30 AM IST — rolling page scan
     - cron: "0 4 * * 1"   # Mon ~9:30 AM IST — weekly report
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: brand-manager-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   scan:
     if: github.event.schedule == '0 1 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,6 +32,7 @@ jobs:
   report:
     if: github.event.schedule == '0 4 * * 1' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

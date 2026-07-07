@@ -4,9 +4,15 @@ on:
   schedule:
     - cron: "0 4 1 * *"    # 1st of each month (~09:30 IST)
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 25-skillgap-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

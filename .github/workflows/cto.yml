@@ -5,9 +5,15 @@ on:
   schedule:
     - cron: "0 3 * * *"   # daily ~8:30 AM IST
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cto-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   patrol:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

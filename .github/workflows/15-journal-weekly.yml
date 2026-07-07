@@ -4,9 +4,15 @@ on:
   schedule:
     - cron: "30 3 * * 0"    # Sundays ~9:00 AM IST
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 15-journal-weekly-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

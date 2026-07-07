@@ -3,9 +3,15 @@
 name: Register Bot Commands
 on:
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: register-commands-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

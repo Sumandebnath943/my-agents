@@ -4,9 +4,15 @@ on:
   schedule:
     - cron: "0 3 * * *"   # daily, well within the 7-day window
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 02-supabase-keepalive-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
