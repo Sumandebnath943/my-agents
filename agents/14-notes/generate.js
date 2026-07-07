@@ -2,6 +2,7 @@
 // Reusable: turn a YouTube/article URL into structured notes (used by the CLI
 // workflow AND the /notes Telegram command).
 import { env } from "../../lib/env.js";
+import { scrapeClean } from "../../lib/scrape.js";
 
 export async function generateNotes(url) {
   const isYouTube = /youtube\.com|youtu\.be/.test(url);
@@ -10,8 +11,7 @@ export async function generateNotes(url) {
   if (isYouTube) {
     parts.push({ file_data: { file_uri: url } });
   } else {
-    const html = await fetch(url).then((r) => r.text());
-    const text = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 12000);
+    const text = await scrapeClean(url, { max: 12000 }); // Firecrawl when available, else fetch+strip
     parts.push({ text: `Article (${url}):\n${text}` });
   }
 

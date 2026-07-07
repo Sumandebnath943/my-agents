@@ -13,6 +13,8 @@ import { env } from "../lib/env.js";
 import { getState, setState } from "../lib/store.js";
 import { notifyTelegram } from "../lib/notify.js";
 import { profileContext } from "../lib/profile.js";
+import { webSearch } from "../lib/search.js";
+import { scrapeClean } from "../lib/scrape.js";
 
 const SERVER = { name: "migi", version: "1.0.0" };
 const REPO = process.env.GITHUB_REPOSITORY || "Sumandebnath943/my-agents";
@@ -69,6 +71,18 @@ export const TOOLS = [
     description: "Send a plain-text message to Suman's Telegram (notifications/answers).",
     inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
     handler: async ({ text }) => { await notifyTelegram(text); return "ok: sent"; },
+  },
+  {
+    name: "web_search",
+    description: "Real-time web search (Tavily). Returns [{title,url,content}]. Empty if search is unavailable.",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, max: { type: "integer" } }, required: ["query"] },
+    handler: async ({ query, max = 5 }) => JSON.stringify(await webSearch(query, { max }), null, 2),
+  },
+  {
+    name: "scrape_url",
+    description: "Fetch clean, LLM-ready text for a URL (Firecrawl when available, else fetch+strip).",
+    inputSchema: { type: "object", properties: { url: { type: "string" }, max: { type: "integer" } }, required: ["url"] },
+    handler: async ({ url, max = 8000 }) => (await scrapeClean(url, { max })) || "(no content)",
   },
   {
     name: "github_workflow_trigger",

@@ -4,6 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callGemini, parseJson } from "../../lib/llm.js";
+import { scrapeClean } from "../../lib/scrape.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
@@ -13,14 +14,8 @@ export async function handleReadLater(msg) {
   const urls = msg.text.match(URL_RE) || [];
   let saved = 0;
   for (const url of urls) {
-    // Fetch the page and strip tags to rough text (good enough for summarizing).
-    let text = "";
-    try {
-      const html = await fetch(url).then((r) => r.text());
-      text = html.replace(/<script[\s\S]*?<\/script>/gi, "")
-                 .replace(/<style[\s\S]*?<\/style>/gi, "")
-                 .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 8000);
-    } catch { text = ""; }
+    // Clean article text — Firecrawl when available (better on JS/paywalled pages), else fetch+strip.
+    const text = await scrapeClean(url, { max: 8000 });
 
     const out = await callGemini(
       `Summarize this article for my reading queue. Return ONLY JSON:

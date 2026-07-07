@@ -19,6 +19,7 @@ import { WRITING_PLAYBOOK, VALUE_BAR } from "./voice.js";
 import { trendingHashtags } from "../../lib/hashtags.js";
 import { stripMarkdown } from "../../lib/email-template.js";
 import { critique } from "../../lib/critique.js";
+import { webSearch } from "../../lib/search.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const OWNER = "Sumandebnath943";
@@ -109,7 +110,10 @@ async function safetyReview(post) {
 // Core generation — grounds a chosen news item to the real Suman and writes the post.
 // regenOf: update that existing row instead of inserting. previousPost: force a new angle.
 async function writePost(item, { regenOf = null, previousPost = null } = {}) {
-  const [portfolio, work, recents] = await Promise.all([stripFetch(PORTFOLIO_URL), recentWork(), recentPosts()]);
+  const [portfolio, work, recents, research] = await Promise.all([stripFetch(PORTFOLIO_URL), recentWork(), recentPosts(), webSearch(item.headline, { max: 4 })]);
+  const researchBlock = research.length
+    ? `\n\nRECENT WEB CONTEXT on this news (for accuracy — don't quote verbatim, synthesize):\n${research.map((r) => `- ${r.title}: ${(r.content || "").slice(0, 220)}`).join("\n")}`
+    : "";
   const out = await geminiThenGroq(
     `You are ghostwriting a LinkedIn post in MY voice to position me as an ${PROFILE.positioning}.
 ${profileContext()}
@@ -122,7 +126,7 @@ ${work || "(none notable)"}
 
 THE NEWS I CHOSE TO POST ABOUT:
 ${item.headline}${item.link ? ` (${item.link})` : ""}
-${item.angle ? `A possible angle: ${item.angle}` : ""}
+${item.angle ? `A possible angle: ${item.angle}` : ""}${researchBlock}
 
 Write a LinkedIn post reacting to THIS news with MY real angle. The news is the hook; MY insight, grounded in my work/beliefs, is the point. It MUST teach the reader one concrete, valuable thing — never just restate the news.
 
