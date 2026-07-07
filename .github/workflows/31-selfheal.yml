@@ -1,0 +1,37 @@
+# .github/workflows/31-selfheal.yml
+# Failure Triage — scans recent failed Actions runs and Telegrams a diagnosis + suggested fix.
+# Suggestion-only (no code changes, no re-runs). `name:` MUST stay "Failure Triage" so the agent
+# skips its own runs (no alert loops).
+name: Failure Triage
+on:
+  schedule:
+    - cron: "15 */6 * * *"   # every 6h, offset off the hour
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read              # list runs/jobs + read logs
+concurrency:
+  group: 31-selfheal-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/31-selfheal/index.js
+        env:
+          AGENT_NAME: selfheal
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

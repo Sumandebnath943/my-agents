@@ -6,8 +6,9 @@ import { run as routing } from "./routing/run.mjs";
 import { run as json } from "./json/run.mjs";
 import { run as linkedin } from "./linkedin/run.mjs";
 import { run as critique } from "./critique/run.mjs";
+import { run as mcp } from "./mcp/run.mjs";
 
-const suites = [routing, json, linkedin, critique];
+const suites = [routing, json, linkedin, critique, mcp];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];
