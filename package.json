@@ -5,10 +5,11 @@
   "private": true,
   "scripts": {
     "hello": "node agents/00-hello/index.js",
-    "check": "node --check agents/inbox-router/route.js && node --check lib/llm.js && node --check lib/store.js",
+    "check": "node --check agents/inbox-router/route.js && node --check lib/llm.js && node --check lib/store.js && node --check lib/critique.js",
     "eval:routing": "node evals/routing/run.mjs",
     "eval:json": "node evals/json/run.mjs",
     "eval:linkedin": "node evals/linkedin/run.mjs",
+    "eval:critique": "node evals/critique/run.mjs",
     "eval:all": "node evals/run-all.mjs",
     "eval:finance": "echo \"Finance classifier + eval live in the agents-dashboard repo: node scripts/finance-eval.mjs\""
   },

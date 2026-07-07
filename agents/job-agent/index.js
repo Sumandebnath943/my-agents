@@ -10,6 +10,7 @@ import { env } from "../../lib/env.js";
 import { TITLES, LOCATIONS, MIN_FIT, GREENHOUSE, LEVER, ASHBY } from "./config.js";
 import { greenhouse, lever, ashby, remoteBoards } from "./ats.js";
 import { callGemini, parseJson } from "../../lib/llm.js";
+import { critique } from "../../lib/critique.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
@@ -53,6 +54,20 @@ MY CV:\n${CV.slice(0, 6000)}\n\nJOB: ${j.title} @ ${j.company} (${j.location})\n
     );
     scored = parseJson(out);
   } catch { continue; }
+  // For roles that clear the bar (the ones I'll actually see), self-critique the cover letter for
+  // factual grounding — no fabricated metrics/titles/employers — before storing/emailing it.
+  // Best-effort: a critic failure leaves the letter as generated. Gated on fit to stay within limits.
+  if (scored.fit >= MIN_FIT) {
+    const crit = await critique(scored.cover_letter, {
+      role: "You fact-check job cover letters against the candidate's CV.",
+      criteria:
+`- Every claim is grounded ONLY in the CV below — NO fabricated metrics, titles, employers, or dates
+- Specific to THIS company and role, not a generic template
+- Confident and concise (150-200 words), no clichés
+CV:\n${CV.slice(0, 3000)}`,
+    });
+    scored.cover_letter = crit.text;
+  }
   await db.from("jobs").insert({
     title: j.title, company: j.company, location: j.location, url: j.url,
     apply_url: j.apply_url, ats: j.ats, fit: scored.fit,

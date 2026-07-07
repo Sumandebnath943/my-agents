@@ -18,6 +18,7 @@ import { AI_FEEDS } from "./sources.js";
 import { WRITING_PLAYBOOK, VALUE_BAR } from "./voice.js";
 import { trendingHashtags } from "../../lib/hashtags.js";
 import { stripMarkdown } from "../../lib/email-template.js";
+import { critique } from "../../lib/critique.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const OWNER = "Sumandebnath943";
@@ -142,6 +143,19 @@ Return ONLY JSON {"post":"the full post, formatted with real line breaks","groun
   try { o = parseJson(out); } catch { o = {}; }
   if (!o.post) { await notifyTelegram("🤔 Couldn't draft that one — try another news item or /linkedin again.", { html: true }); return; }
   o.post = stripMarkdown(o.post); // LinkedIn renders markdown literally — keep it plain text
+
+  // Self-critique: catch off-brand / generic / cliché drafts before they reach me. Best-effort —
+  // if the critic call fails, o.post is returned unchanged. Runs before the safety review below.
+  const crit = await critique(o.post, {
+    role: "You review LinkedIn posts written in Suman's first-person voice.",
+    criteria:
+`- Sounds like a specific person with a real point of view, not a generic "thought leader"
+- Teaches ONE concrete, valuable thing; the news is only the hook, not the payload
+- No clichés, buzzword salad, or hollow inspiration
+- Plain text only (no markdown), at most 1 emoji, no hashtags
+Voice bar: ${VALUE_BAR}`,
+  });
+  o.post = stripMarkdown(crit.text); // re-strip in case the critic reintroduced any markdown
 
   const hashtags = (await trendingHashtags(item.headline || "AI", { platform: "linkedin", count: 3 })).join(" ");
   const review = await safetyReview(o.post);

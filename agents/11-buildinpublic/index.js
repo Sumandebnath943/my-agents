@@ -2,6 +2,7 @@
 // Draft-only: turn the day's git activity into a short build-in-public post → email.
 import { env } from "../../lib/env.js";
 import { callGroq } from "../../lib/llm.js";
+import { critique } from "../../lib/critique.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail } from "../../lib/email-template.js";
 import { PROFILE } from "../../lib/profile.js";
@@ -33,10 +34,19 @@ for (const r of await ownedRepos()) {
 
 if (!work) { console.log("No commits today — nothing to post."); process.exit(0); }
 
-const post = await callGroq([
+let post = await callGroq([
   { role: "system", content: `Write a single short build-in-public post (under 280 chars), first person, upbeat but not cringe, at most 1 emoji, no hashtags. Voice: ${PROFILE.voice}` },
   { role: "user", content: `Today I worked on:${work}` },
 ]);
+
+// Self-critique: keep it genuine, not boastful. Best-effort — failure leaves the post as written.
+post = (await critique(post, {
+  role: "You review build-in-public posts.",
+  criteria:
+`- Genuine and grounded in the actual work below; NOT boastful, hypey, or humble-braggy
+- Under 280 characters, first person, at most 1 emoji, no hashtags, no markdown
+Work:\n${work}`,
+})).text;
 
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const html = renderEmail({
