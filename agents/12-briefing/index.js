@@ -1,6 +1,6 @@
 // agents/12-briefing/index.js
 import { INTERESTS, RSS_FEEDS } from "./sources.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { geminiThenGroq, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail } from "../../lib/email-template.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
@@ -27,8 +27,9 @@ const seen = new Set();
 const all = raw.filter((a) => { const k = a.title.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
 if (!all.length) { console.log("No items fetched."); process.exit(0); }
 
-// Ask Gemini to curate into themed sections as JSON (so we control the design).
-const out = await callGemini(
+// Ask Gemini to curate into themed sections as JSON (so we control the design). Fall back to
+// Groq if Gemini is rate-limited, so the daily briefing never hard-fails.
+const out = await geminiThenGroq(
   `You are my personal tech curator. From these headlines, pick the 8-12 most relevant to my
 interests (${INTERESTS.join(", ")}). Group them into 2-4 themed sections. Prefer notable
 releases and genuinely important news over low-signal chatter.

@@ -49,7 +49,7 @@ for (const page of due || []) {
     } else if (audits < AUDITS_PER_DAY) {
       const out = await callGemini(
         `On-page SEO audit. Return JSON {"score":0-100,"issues":[{"severity":"high|med|low","note":""}],"quick_wins":[""]}. Judge title, meta description, heading structure, alt coverage, schema, content depth. Fields:\n${JSON.stringify(ex.fields)}`,
-        { json: true });
+        { json: true, model: "gemini-2.5-flash-lite" }); // own 15 RPM bucket — keeps this batch off flash's 10 RPM
       row.content_hash = ex.hash; row.seo_audit = parseJson(out); audits++;   // changed + budget available
     } else {
       row.seo_audit = page.seo_audit || null;                                 // budget spent: keep OLD hash so it re-audits next rotation
