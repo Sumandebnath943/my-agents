@@ -15,6 +15,9 @@ directly — nothing new is added to the agent workflows' `npm ci`.
 | `kv_get` / `kv_set` | Read/write the fleet's `kv` store | Supabase |
 | `supabase_query` | Read any table (filters, order, limit) | Supabase (read) |
 | `profile_context` | Suman's positioning/context block | local |
+| `memory_remember` / `memory_recall` | Save/recall durable scoped memories (semantic) | Supabase + Gemini |
+| `web_search` | Real-time web search (Tavily) | Tavily |
+| `scrape_url` | Clean LLM-ready text for a URL (Firecrawl) | Firecrawl |
 | `telegram_send` | Send a plain-text Telegram message | Telegram |
 | `github_workflow_trigger` | Manually run an agent by workflow filename | GitHub API |
 

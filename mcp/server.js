@@ -15,6 +15,7 @@ import { notifyTelegram } from "../lib/notify.js";
 import { profileContext } from "../lib/profile.js";
 import { webSearch } from "../lib/search.js";
 import { scrapeClean } from "../lib/scrape.js";
+import { remember, recall } from "../lib/memory.js";
 
 const SERVER = { name: "migi", version: "1.0.0" };
 const REPO = process.env.GITHUB_REPOSITORY || "Sumandebnath943/my-agents";
@@ -71,6 +72,18 @@ export const TOOLS = [
     description: "Send a plain-text message to Suman's Telegram (notifications/answers).",
     inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
     handler: async ({ text }) => { await notifyTelegram(text); return "ok: sent"; },
+  },
+  {
+    name: "memory_remember",
+    description: "Save a durable memory (preference/fact) the fleet can recall later. Scope: user|agent|session.",
+    inputSchema: { type: "object", properties: { content: { type: "string" }, scope: { type: "string" }, scopeKey: { type: "string" }, source: { type: "string" } }, required: ["content"] },
+    handler: async ({ content, scope, scopeKey, source }) => JSON.stringify(await remember(content, { scope, scopeKey, source })),
+  },
+  {
+    name: "memory_recall",
+    description: "Recall the most relevant saved memories for a query (semantic). Returns [{content,score,source}].",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, scope: { type: "string" }, scopeKey: { type: "string" }, k: { type: "integer" } }, required: ["query"] },
+    handler: async ({ query, scope, scopeKey, k = 5 }) => JSON.stringify(await recall(query, { scope, scopeKey, k }), null, 2),
   },
   {
     name: "web_search",

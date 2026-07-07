@@ -1,0 +1,32 @@
+# .github/workflows/30-browser.yml
+# Web Watch — headless-browser page watcher (Playwright + Gemini vision). Alerts on change only.
+# Playwright is installed HERE, not in package.json, so the other 38 workflows' `npm ci` stays lean.
+# Dormant until you add targets to kv `browser:watchlist`.
+name: Web Watch
+on:
+  schedule:
+    - cron: "40 7 * * *"   # once a day
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 30-browser-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: npm i playwright --no-save && npx playwright install --with-deps chromium
+      - run: node agents/30-browser/index.js
+        env:
+          AGENT_NAME: browser
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

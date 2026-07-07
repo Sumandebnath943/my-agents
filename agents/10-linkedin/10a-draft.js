@@ -20,6 +20,9 @@ import { trendingHashtags } from "../../lib/hashtags.js";
 import { stripMarkdown } from "../../lib/email-template.js";
 import { critique } from "../../lib/critique.js";
 import { webSearch } from "../../lib/search.js";
+import { recall, extractAndRemember } from "../../lib/memory.js";
+
+const VOICE_SCOPE = { scope: "user", scopeKey: "linkedin_voice" };
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const OWNER = "Sumandebnath943";
@@ -110,9 +113,16 @@ async function safetyReview(post) {
 // Core generation — grounds a chosen news item to the real Suman and writes the post.
 // regenOf: update that existing row instead of inserting. previousPost: force a new angle.
 async function writePost(item, { regenOf = null, previousPost = null } = {}) {
-  const [portfolio, work, recents, research] = await Promise.all([stripFetch(PORTFOLIO_URL), recentWork(), recentPosts(), webSearch(item.headline, { max: 4 })]);
+  const [portfolio, work, recents, research, voice] = await Promise.all([
+    stripFetch(PORTFOLIO_URL), recentWork(), recentPosts(),
+    webSearch(item.headline, { max: 4 }),
+    recall("LinkedIn voice, tone and style preferences", { ...VOICE_SCOPE, k: 5 }), // learned from my past edits
+  ]);
   const researchBlock = research.length
     ? `\n\nRECENT WEB CONTEXT on this news (for accuracy — don't quote verbatim, synthesize):\n${research.map((r) => `- ${r.title}: ${(r.content || "").slice(0, 220)}`).join("\n")}`
+    : "";
+  const voiceBlock = voice.length
+    ? `\n\nMY LEARNED VOICE PREFERENCES (from edits I've made before — honor these):\n${voice.map((v) => `- ${v.content}`).join("\n")}`
     : "";
   const out = await geminiThenGroq(
     `You are ghostwriting a LinkedIn post in MY voice to position me as an ${PROFILE.positioning}.
@@ -126,7 +136,7 @@ ${work || "(none notable)"}
 
 THE NEWS I CHOSE TO POST ABOUT:
 ${item.headline}${item.link ? ` (${item.link})` : ""}
-${item.angle ? `A possible angle: ${item.angle}` : ""}${researchBlock}
+${item.angle ? `A possible angle: ${item.angle}` : ""}${researchBlock}${voiceBlock}
 
 Write a LinkedIn post reacting to THIS news with MY real angle. The news is the hook; MY insight, grounded in my work/beliefs, is the point. It MUST teach the reader one concrete, valuable thing — never just restate the news.
 
@@ -207,6 +217,8 @@ Return ONLY JSON {"post":"revised post text, formatted with real line breaks"}.`
   const warning = review.safe ? null : review.reasons.join("; ");
   await db.from("linkedin_posts").update({ post: revised, status: "awaiting", edit_note: note, warning, updated_at: new Date().toISOString() }).eq("id", id);
   await sendDraft(id, { ...row, post: revised, warning });
+  // Learn from the edit: extract durable voice preferences so future drafts honor them. Best-effort.
+  if (note) await extractAndRemember(`When ghostwriting Suman's LinkedIn posts, apply this edit instruction he gave: "${note}".`, { ...VOICE_SCOPE, source: "linkedin_edit" });
   console.log("edit: revised", id);
   process.exit(0);
 }
