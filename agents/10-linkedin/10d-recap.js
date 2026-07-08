@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail } from "../../lib/email-template.js";
+import { openValue } from "../../lib/crypto.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -14,7 +15,7 @@ if (!data?.length) {
 }
 
 const { data: tk } = await db.from("kv").select("value").eq("key", "linkedin:token").maybeSingle();
-const token = tk?.value;
+const token = openValue(tk?.value);
 
 async function engagement(urn) {
   if (!token?.access_token || !urn) return null;

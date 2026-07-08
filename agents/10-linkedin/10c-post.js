@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { notifyEmail, notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { renderEmail, stripMarkdown } from "../../lib/email-template.js";
+import { sealValue, openValue } from "../../lib/crypto.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
@@ -23,7 +24,7 @@ async function freshToken(t) {
     }).then((r) => r.json());
     if (r.access_token) {
       const updated = { ...t, access_token: r.access_token, obtained: Date.now() };
-      await db.from("kv").upsert({ key: "linkedin:token", value: updated, updated_at: new Date().toISOString() });
+      await db.from("kv").upsert({ key: "linkedin:token", value: sealValue(updated), updated_at: new Date().toISOString() });
       return updated.access_token;
     }
   }
@@ -38,7 +39,7 @@ if (!row) { console.error("Post not found:", postId); process.exit(1); }
 if (row.status === "posted") { console.log("Already posted."); process.exit(0); }
 
 const { data: tk } = await db.from("kv").select("value").eq("key", "linkedin:token").maybeSingle();
-const token = tk?.value;
+const token = openValue(tk?.value);
 if (!token?.access_token) {
   await notifyTelegram("🔴 <b>Can't post:</b> LinkedIn isn't connected. Open the Migi dashboard → LinkedIn → Connect.", { html: true });
   process.exit(1);
