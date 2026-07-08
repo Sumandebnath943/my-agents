@@ -10,6 +10,7 @@
 // forces Postgres to stay awake. (Defaults to "kv" if omitted.)
 import { env } from "../../lib/env.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
+import { setState } from "../../lib/store.js";
 
 const projects = JSON.parse(env("SUPABASE_PROJECTS"));
 
@@ -36,6 +37,16 @@ async function ping(p) {
 const results = await Promise.all(projects.map(ping));
 const paused = results.filter((r) => !r.alive);                    // unreachable → likely paused
 const inactive = results.filter((r) => r.alive && !r.active);      // reachable but the query didn't run → NOT being kept alive
+
+// Persist the latest status so the dashboard can show a live Supabase Keep-Alive card. Best-effort:
+// a kv write failure must never break the ping itself. Writes to the MAIN fleet project's kv.
+await setState("supabase:keepalive", {
+  checked_at: new Date().toISOString(),
+  total: results.length,
+  paused: paused.length,
+  inactive: inactive.length,
+  projects: results.map((r) => ({ name: r.name, alive: r.alive, active: r.active, code: r.code, table: r.table })),
+}).catch((e) => console.error("keepalive kv write failed (ignored):", e.message));
 
 // DIGEST=1 -> also send a healthy "all clear" confirmation (the weekly run).
 // No flag -> alert-only: stay silent unless something looks wrong (daily run).

@@ -24,5 +24,7 @@ jobs:
         env:
           DIGEST: "1"
           SUPABASE_PROJECTS: ${{ secrets.SUPABASE_PROJECTS }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
