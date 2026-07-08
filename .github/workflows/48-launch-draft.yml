@@ -24,8 +24,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
       - run: npm ci
-      - run: node agents/48-launch/index.js "${{ github.event.inputs.owner }}" "${{ github.event.inputs.repo }}"
+      - run: node agents/48-launch/index.js "$LAUNCH_OWNER" "$LAUNCH_REPO"
         env:
+          LAUNCH_OWNER: ${{ github.event.inputs.owner }}
+          LAUNCH_REPO: ${{ github.event.inputs.repo }}
           AGENT_NAME: launch
           GH_PAT: ${{ secrets.GH_PAT }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

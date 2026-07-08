@@ -27,8 +27,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
       - run: npm ci
-      - run: node agents/20-finance/digest.js ${{ github.event.inputs.period || 'week' }}
+      - run: node agents/20-finance/digest.js "$PERIOD"
         env:
+          PERIOD: ${{ github.event.inputs.period || 'week' }}
           AGENT_NAME: finance
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

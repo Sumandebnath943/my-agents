@@ -20,6 +20,22 @@ import { remember, recall } from "../lib/memory.js";
 const SERVER = { name: "migi", version: "1.0.0" };
 const REPO = process.env.GITHUB_REPOSITORY || "Sumandebnath943/my-agents";
 
+// --- Prompt-injection hardening (opt-in; safe defaults preserve current behavior) ---------------
+// When this MCP is driven by an LLM that also ingests untrusted content (scrape_url/web_search),
+// a hostile page can try to make the model call supabase_query then telegram_send to exfiltrate
+// data (the "lethal trifecta"). These knobs contain that blast radius:
+//   MCP_READONLY=1            -> disable every side-effecting tool (kv_set, memory_remember,
+//                                telegram_send, github_workflow_trigger). Use in any context that
+//                                also reads untrusted web content.
+//   MCP_QUERY_TABLES=a,b,c    -> restrict supabase_query to this table allowlist.
+//   MCP_DISPATCH_WORKFLOWS=x  -> restrict github_workflow_trigger to this workflow allowlist.
+// The `sessions` table (raw session ids) is ALWAYS blocked from supabase_query.
+const READONLY = process.env.MCP_READONLY === "1";
+const csv = (s) => (s || "").split(",").map((x) => x.trim()).filter(Boolean);
+const QUERY_ALLOW = csv(process.env.MCP_QUERY_TABLES);
+const DISPATCH_ALLOW = csv(process.env.MCP_DISPATCH_WORKFLOWS);
+const BLOCKED_TABLES = new Set(["sessions"]);
+
 let _db;
 const db = () => (_db ||= createClient(env("SUPABASE_URL"), env("SUPABASE_KEY")));
 
@@ -33,6 +49,7 @@ export const TOOLS = [
   },
   {
     name: "kv_set",
+    sideEffect: true,
     description: "Write a value to the fleet's key-value store. `value` may be any JSON.",
     inputSchema: { type: "object", properties: { key: { type: "string" }, value: {} }, required: ["key", "value"] },
     handler: async ({ key, value }) => { await setState(key, value); return `ok: set ${key}`; },
@@ -52,6 +69,8 @@ export const TOOLS = [
       required: ["table"],
     },
     handler: async ({ table, match = {}, order_by, ascending = false, limit = 50 }) => {
+      if (BLOCKED_TABLES.has(String(table))) throw new Error(`table not permitted: ${table}`);
+      if (QUERY_ALLOW.length && !QUERY_ALLOW.includes(String(table))) throw new Error(`table not in MCP_QUERY_TABLES allowlist: ${table}`);
       let q = db().from(table).select("*");
       for (const [k, v] of Object.entries(match)) q = q.eq(k, v);
       if (order_by) q = q.order(order_by, { ascending });
@@ -69,12 +88,14 @@ export const TOOLS = [
   },
   {
     name: "telegram_send",
+    sideEffect: true,
     description: "Send a plain-text message to Suman's Telegram (notifications/answers).",
     inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
     handler: async ({ text }) => { await notifyTelegram(text); return "ok: sent"; },
   },
   {
     name: "memory_remember",
+    sideEffect: true,
     description: "Save a durable memory (preference/fact) the fleet can recall later. Scope: user|agent|session.",
     inputSchema: { type: "object", properties: { content: { type: "string" }, scope: { type: "string" }, scopeKey: { type: "string" }, source: { type: "string" } }, required: ["content"] },
     handler: async ({ content, scope, scopeKey, source }) => JSON.stringify(await remember(content, { scope, scopeKey, source })),
@@ -99,6 +120,7 @@ export const TOOLS = [
   },
   {
     name: "github_workflow_trigger",
+    sideEffect: true,
     description: "Manually run a fleet agent by its workflow file name (e.g. '12-briefing.yml'). Optional ref + inputs.",
     inputSchema: {
       type: "object",
@@ -106,6 +128,7 @@ export const TOOLS = [
       required: ["workflow"],
     },
     handler: async ({ workflow, ref = "main", inputs = {} }) => {
+      if (DISPATCH_ALLOW.length && !DISPATCH_ALLOW.includes(String(workflow))) throw new Error(`workflow not in MCP_DISPATCH_WORKFLOWS allowlist: ${workflow}`);
       const res = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/${workflow}/dispatches`, {
         method: "POST",
         headers: { Authorization: `Bearer ${env("GH_PAT")}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
@@ -133,11 +156,14 @@ export async function handleRequest(msg) {
     if (method === "ping") return ok({});
     if (method?.startsWith("notifications/")) return null; // initialized / cancelled / etc.
     if (method === "tools/list") {
-      return ok({ tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) });
+      // In read-only mode, hide side-effecting tools entirely so an injected prompt can't even name them.
+      const visible = READONLY ? TOOLS.filter((t) => !t.sideEffect) : TOOLS;
+      return ok({ tools: visible.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) });
     }
     if (method === "tools/call") {
       const tool = byName[params?.name];
       if (!tool) return fail(-32602, `Unknown tool: ${params?.name}`);
+      if (READONLY && tool.sideEffect) return ok({ content: [{ type: "text", text: "Error: tool disabled in MCP_READONLY mode" }], isError: true });
       try {
         const text = await tool.handler(params.arguments || {});
         return ok({ content: [{ type: "text", text: String(text) }] });

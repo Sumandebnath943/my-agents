@@ -22,8 +22,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
       - run: npm ci
-      - run: node agents/14-notes/index.js "${{ github.event.inputs.url }}"
+      - run: node agents/14-notes/index.js "$NOTES_URL"
         env:
+          NOTES_URL: ${{ github.event.inputs.url }}
           AGENT_NAME: notes
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
