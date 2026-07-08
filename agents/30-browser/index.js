@@ -8,7 +8,7 @@
 // so this agent is dormant until YOU add targets (via the MCP kv_set tool or the dashboard).
 import { chromium } from "playwright";
 import { getState, setState } from "../../lib/store.js";
-import { callGemini } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const watchlist = (await getState("browser:watchlist", [])) || [];
@@ -26,9 +26,9 @@ try {
       const base64 = (await page.screenshot({ fullPage: false })).toString("base64");
       await page.close();
 
-      const answer = (await callGemini(
+      const answer = (await callLLM(
         `This is a screenshot of ${url}. ${question || "Summarize the key state of this page"}. Reply with ONLY the short answer/value, no preamble.`,
-        { images: [{ mimeType: "image/png", base64 }] }
+        { images: [{ mimeType: "image/png", base64 }] } // images → vision chain (Gemini → GPT-4o)
       )).trim().slice(0, 300);
 
       const prev = await getState(`browser:last:${id}`, null);

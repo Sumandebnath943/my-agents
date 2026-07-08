@@ -8,7 +8,7 @@ import { env } from "../../lib/env.js";
 import { PROPERTIES } from "./properties.js";
 import { discoverPages } from "./discover.js";
 import { extractSeo } from "./extract.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const PAGES_PER_DAY = Number(process.env.BRAND_PAGES_PER_DAY || 12);
@@ -47,7 +47,7 @@ for (const page of due || []) {
     if (page.content_hash === ex.hash && page.seo_audit) {
       row.content_hash = ex.hash; row.seo_audit = page.seo_audit;            // unchanged — reuse, no LLM
     } else if (audits < AUDITS_PER_DAY) {
-      const out = await callGemini(
+      const out = await callLLM(
         `On-page SEO audit. Return JSON {"score":0-100,"issues":[{"severity":"high|med|low","note":""}],"quick_wins":[""]}. Judge title, meta description, heading structure, alt coverage, schema, content depth. Fields:\n${JSON.stringify(ex.fields)}`,
         { json: true, model: "gemini-2.5-flash-lite" }); // own 15 RPM bucket — keeps this batch off flash's 10 RPM
       row.content_hash = ex.hash; row.seo_audit = parseJson(out); audits++;   // changed + budget available

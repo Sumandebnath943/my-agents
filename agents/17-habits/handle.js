@@ -3,7 +3,7 @@
 // e.g. "slept 2:30 woke 9 gym yes read no productivity 4"
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { callGroq, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyTelegram } from "../../lib/notify.js";
 
 
@@ -15,12 +15,12 @@ const HABIT_RE = /\bslept\b|\bwoke\b|\bproductivity\b/i;
 export function isHabitLog(text) { return HABIT_RE.test(text || ""); }
 
 export async function handleHabit(msg) {
-  const out = await callGroq(
+  const out = await callLLM(
     [
       { role: "system", content: 'Parse a daily habit log into JSON {"sleep_time":"HH:MM","wake_time":"HH:MM","exercised":true,"read_today":false,"productivity":1-5,"note":""}. Use null for anything not mentioned.' },
       { role: "user", content: msg.text },
     ],
-    { json: true }
+    { json: true, chain: "private" } // Groq primary → OpenAI fallback; never free-tier providers
   );
   const h = parseJson(out);
   await db.from("habits").insert({ log_date: new Date().toISOString().slice(0, 10), ...h });

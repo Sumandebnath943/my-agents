@@ -4,7 +4,7 @@
 // Telegrams them with a one-tap "Post the Bluesky one" button (auto-postable, free). Show HN /
 // Reddit / X / Product Hunt stay copy-only — you submit those yourself (each has its own etiquette).
 import { env } from "../../lib/env.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { setState } from "../../lib/store.js";
 
@@ -20,7 +20,7 @@ if (!meta || meta.message) { await notifyTelegram(`🔴 Launch: couldn't read ${
 const readme = await fetch(`https://raw.githubusercontent.com/${owner}/${repo}/${meta.default_branch || "main"}/README.md`)
   .then((r) => (r.ok ? r.text() : "")).catch(() => "");
 
-const drafts = await callGemini(
+const drafts = await callLLM(
   `I'm launching this project. Write tailored launch posts in a confident, specific, non-cringe voice. Return ONLY JSON:
 {"show_hn":"Show HN title + 2-line body","reddit":"a r/SideProject-style post","bluesky":"<=290 chars, punchy, at most 1 emoji, no hashtag spam","x":"<=270 chars","producthunt_tagline":"<=60 chars"}.
 Project: ${meta.name} — ${meta.description || ""}

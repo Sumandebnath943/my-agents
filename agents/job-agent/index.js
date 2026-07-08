@@ -9,7 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { TITLES, LOCATIONS, MIN_FIT, GREENHOUSE, LEVER, ASHBY } from "./config.js";
 import { greenhouse, lever, ashby, remoteBoards } from "./ats.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { critique } from "../../lib/critique.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail, mdToHtml } from "../../lib/email-template.js";
@@ -46,7 +46,7 @@ const results = [];
 for (const j of fresh.slice(0, 12)) {
   let scored;
   try {
-    const out = await callGemini(
+    const out = await callLLM(
       `You are my job-application assistant. Given my CV and this job, return JSON:
 {"fit":0-100 how well I match,"reasons":"1-2 lines","cover_letter":"a tailored 150-200 word cover letter referencing THIS company and role, in a confident, specific, non-generic voice","emphasize":"which of my CV points to foreground"}.
 MY CV:\n${CV.slice(0, 6000)}\n\nJOB: ${j.title} @ ${j.company} (${j.location})\n${j.description}`,

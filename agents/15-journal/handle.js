@@ -3,19 +3,19 @@
 // Uses Groq (private — Gemini's free tier may train on inputs; reflections stay on Groq).
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { callGroq, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
 export async function handleJournal(msg) {
   if (!msg.text || msg.text.length < 10) return false; // skip stray short messages
-  const out = await callGroq(
+  const out = await callLLM(
     [
       { role: "system", content: 'Turn a journal brain-dump into JSON {"mood":"one or two words","themes":["..."],"summary":"2-sentence reflective summary"}. Be warm, never judgmental.' },
       { role: "user", content: msg.text },
     ],
-    { json: true } // Groq keeps this private
+    { json: true, chain: "private" } // Groq primary → OpenAI fallback; never free-tier providers
   );
   const { mood, themes, summary } = parseJson(out);
   await db.from("journal").insert({

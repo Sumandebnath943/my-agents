@@ -7,7 +7,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { OWNER, FOCUS } from "./config.js";
-import { callGroq, parseJson } from "../../lib/llm.js";
+import { callGroq, callLLM, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
@@ -37,8 +37,8 @@ try {
   research = await callGroq([{ role: "user", content: `Search the web: what skills, tools, or capabilities are most in-demand and rising RIGHT NOW for someone whose focus is: ${FOCUS}? Give a concise brief of the top rising areas.` }], { model: "groq/compound" });
 } catch {}
 
-// 2) Structure into AT MOST TWO skills (default model, JSON).
-const out = await callGroq(
+// 2) Structure into AT MOST TWO skills (routed chain, JSON). Web-search step above stays on Groq.
+const out = await callLLM(
   [
     { role: "system", content: "You are a sharp, realistic mentor. Pick AT MOST TWO specific, learnable skills — one or two, never more. Be selective and concrete. Reply ONLY JSON." },
     { role: "user", content: `My focus: ${FOCUS}

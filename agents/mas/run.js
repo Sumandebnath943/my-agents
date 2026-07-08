@@ -2,7 +2,7 @@
 // the Vercel orchestrator with MISSION_ID. Uses MAS-only LLM keys (mapped into the standard
 // env names by mas.yml, so lib/llm.js transparently uses them) and delivers results to the
 // MAS bot + the MAS blackboard ONLY — never the main channels.
-import { callGroq, callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { profileContext } from "../../lib/profile.js";
 import { getMission, updateMission, addMessage } from "./blackboard.js";
 import { notifyMas, notifyMasLong, esc } from "./notify.js";
@@ -16,7 +16,7 @@ async function warroom(mission) {
   const [company, title] = String(mission.goal).split("|").map((s) => s.trim());
   await addMessage({ mission_id: mission.id, from_agent: "researcher", to_agent: "orchestrator", role: "observation", content: `researching ${company}` });
 
-  const research = await callGroq([
+  const research = await callLLM([
     { role: "system", content: "Research this company for a job applicant using live web info. Return JSON {\"overview\":string,\"products\":string[],\"culture\":string,\"recent\":string[]}." },
     { role: "user", content: `Company: ${company}${title ? `, role: ${title}` : ""}` },
   ], { model: "groq/compound", agent: "mas", temperature: 0.3 }).catch(() => "");
@@ -24,18 +24,18 @@ async function warroom(mission) {
   const cv = process.env.CV_TEXT || "";
   await addMessage({ mission_id: mission.id, from_agent: "orchestrator", to_agent: "critic", role: "plan", content: "score fit + draft cover + warm-up post" });
 
-  const scoring = await callGemini(
+  const scoring = await callLLM(
     `You are an expert recruiter. Given the CANDIDATE CV, the ROLE at ${company}${title ? ` (${title})` : ""}, and COMPANY RESEARCH, return JSON {"fit":0-100,"strengths":string[],"gaps":string[],"keywords_to_add":string[]}. No fabrication.\n\nCV:\n${cv.slice(0, 6000)}\n\nRESEARCH:\n${String(research).slice(0, 4000)}`,
     { json: true, agent: "mas", temperature: 0.3 }
   ).catch(() => "{}");
   const fit = asJson(scoring);
 
-  const cover = await callGemini(
+  const cover = await callLLM(
     `Write a tailored, concise cover letter (max 220 words) for ${title || "this role"} at ${company}, grounded in the CV and company research. Warm, specific, no clichés, no fabricated metrics.\n\nCV:\n${cv.slice(0, 6000)}\n\nRESEARCH:\n${String(research).slice(0, 4000)}`,
     { agent: "mas", temperature: 0.5 }
   ).catch(() => "");
 
-  const post = await callGemini(
+  const post = await callLLM(
     `Write a short LinkedIn post (max 120 words) warming up my network before I apply to ${company} — genuine interest in their space. Ground it in who I am below. Max 2 hashtags, ~1 emoji.\n\nABOUT ME:\n${profile()}`,
     { agent: "mas", temperature: 0.6 }
   ).catch(() => "");
@@ -49,13 +49,13 @@ async function warroom(mission) {
 // ---- #4 Content Engine --------------------------------------------------------------------
 async function content(mission) {
   const kw = mission.goal || "latest in AI";
-  const news = await callGroq([
+  const news = await callLLM([
     { role: "system", content: "Find the most relevant, recent AI/tech news for a post on the given topic. Return JSON {\"headline\":string,\"link\":string,\"why\":string}." },
     { role: "user", content: kw },
   ], { model: "groq/compound", agent: "mas", temperature: 0.3 }).catch(() => "");
   const n = asJson(news);
 
-  const drafts = await callGemini(
+  const drafts = await callLLM(
     `Write 3 platform-tailored posts about "${kw}"${n.headline ? `, anchored on this news: ${n.headline} (${n.link || ""})` : ""}, grounded in who I am below. Return JSON {"linkedin":string,"buildinpublic":string,"bluesky":string}. Authentic voice, no fabricated metrics, LinkedIn under 220 words, Bluesky under 300 chars.\n\nABOUT ME:\n${profile()}`,
     { json: true, agent: "mas", temperature: 0.6 }
   ).catch(() => "{}");

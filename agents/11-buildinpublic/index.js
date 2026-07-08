@@ -1,7 +1,7 @@
 // agents/11-buildinpublic/index.js
 // Draft-only: turn the day's git activity into a short build-in-public post → email.
 import { env } from "../../lib/env.js";
-import { callGroq } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { critique } from "../../lib/critique.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail } from "../../lib/email-template.js";
@@ -34,7 +34,7 @@ for (const r of await ownedRepos()) {
 
 if (!work) { console.log("No commits today — nothing to post."); process.exit(0); }
 
-let post = await callGroq([
+let post = await callLLM([
   { role: "system", content: `Write a single short build-in-public post (under 280 chars), first person, upbeat but not cringe, at most 1 emoji, no hashtags. Voice: ${PROFILE.voice}` },
   { role: "user", content: `Today I worked on:${work}` },
 ]);

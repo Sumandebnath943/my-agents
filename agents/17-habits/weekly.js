@@ -1,7 +1,7 @@
 // agents/17-habits/weekly.js — fortnightly pattern insight, with metric tiles (email).
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { callGroq } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail } from "../../lib/email-template.js";
 
@@ -15,7 +15,7 @@ const readDays = data.filter((h) => h.read_today).length;
 const prods = data.map((h) => Number(h.productivity)).filter((n) => Number.isFinite(n));
 const avgProd = prods.length ? (prods.reduce((a, b) => a + b, 0) / prods.length).toFixed(1) : "—";
 
-const out = await callGroq([
+const out = await callLLM([
   { role: "system", content: "Given 2 weeks of habit logs, find 1-2 honest patterns (e.g. relationship between sleep time and productivity), and one small experiment to try next week. Concrete, not preachy." },
   { role: "user", content: JSON.stringify(data) },
 ]);

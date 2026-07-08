@@ -4,7 +4,7 @@
 // two LLMs, tagged AGENT_NAME=migi). Groq writes the narrative; raw tables are appended.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { callGroq } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
@@ -46,7 +46,7 @@ const agg = (keyFn) => {
 const byProvider = agg((r) => r.provider);            // how each API performs
 const byAgent    = agg((r) => r.agent || "unknown");  // per-agent incl. MIGI's 2 LLMs
 
-const narrative = await callGroq([
+const narrative = await callLLM([
   { role: "system", content: "You are an ops lead. Given weekly LLM fleet metrics (by provider, by agent) plus operational events (email delivery failures, rate-limit warnings), write a tight report: provider health (latency, rate limits, outages), cost/value, any agent that's a cost or failure outlier, and CALL OUT email failures or agents approaching their rate limits if there are any. Note MIGI's provider split if present." },
   { role: "user", content: JSON.stringify({ byProvider, byAgent, ops: opsSummary }) },
 ]);

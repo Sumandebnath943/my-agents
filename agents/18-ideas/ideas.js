@@ -2,7 +2,7 @@
 // Shared idea-backlog logic (used by the CLI and the /idea, /ideas Telegram commands).
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 
 let _db;
 const db = () => (_db ||= createClient(env("SUPABASE_URL"), env("SUPABASE_KEY")));
@@ -31,9 +31,9 @@ const IDEA_SCHEMA = {
 };
 
 export async function addIdea(idea) {
-  const out = await callGemini(
+  const out = await callLLM(
     `Expand this app/agent idea into a tight spec. Idea: ${idea}`,
-    { schema: IDEA_SCHEMA }
+    { schema: IDEA_SCHEMA, chain: "public" } // /idea runs under the webhook (AGENT_NAME=migi)
   );
   const o = parseJson(out);
   const score = (o.impact || 3) * (o.feasibility || 3);

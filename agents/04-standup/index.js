@@ -1,7 +1,7 @@
 // agents/04-standup/index.js
 import { env } from "../../lib/env.js";
 import { OWNER, IGNORE } from "./repos.js";
-import { callGroq } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { getState, setState } from "../../lib/store.js";
 
@@ -58,7 +58,7 @@ const raw =
     .map((r) => `## ${r.repo}\nRecent commits:\n${r.commits.join("\n") || "(none)"}\nOpen:\n${r.openItems.join("\n") || "(none)"}`)
     .join("\n\n") || "(no repo activity in the last 36h)";
 
-const brief = await callGroq([
+const brief = await callLLM([
   { role: "system", content: "You are a focused dev coach. Given activity across repos, write a short 'where you left off' brief: for each repo one line on the apparent current state, then suggest the single highest-leverage next action overall. Keep it tight." },
   { role: "user", content: raw },
 ]);

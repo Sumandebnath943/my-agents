@@ -6,7 +6,7 @@
   "scripts": {
     "hello": "node agents/00-hello/index.js",
     "mcp": "node mcp/server.js",
-    "check": "node --check lib/llm.js && node --check lib/store.js && node --check lib/critique.js && node --check lib/tier.js && node --check lib/memory.js && node --check lib/scrape.js && node --check lib/search.js && node --check mcp/server.js && node --check agents/inbox-router/route.js && node --check agents/30-browser/index.js && node --check agents/31-selfheal/index.js",
+    "check": "node --check lib/llm.js && node --check lib/routing.js && node --check lib/store.js && node --check lib/critique.js && node --check lib/tier.js && node --check lib/memory.js && node --check lib/scrape.js && node --check lib/search.js && node --check mcp/server.js && node --check agents/inbox-router/route.js && node --check agents/30-browser/index.js && node --check agents/31-selfheal/index.js",
     "eval:routing": "node evals/routing/run.mjs",
     "eval:json": "node evals/json/run.mjs",
     "eval:linkedin": "node evals/linkedin/run.mjs",
@@ -14,6 +14,7 @@
     "eval:mcp": "node evals/mcp/run.mjs",
     "eval:tier": "node evals/tier/run.mjs",
     "eval:memory": "node evals/memory/run.mjs",
+    "eval:llm-routing": "node evals/llm-routing/run.mjs",
     "eval:all": "node evals/run-all.mjs",
     "eval:finance": "echo \"Finance classifier + eval live in the agents-dashboard repo: node scripts/finance-eval.mjs\""
   },

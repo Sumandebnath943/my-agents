@@ -6,7 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { PROPERTIES } from "./properties.js";
 import { googleToken } from "../../lib/google-auth.js";
-import { callGemini } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { notifyEmail, notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
@@ -77,7 +77,7 @@ const compact = results.map((r) => ({ name: r.name, tier: r.tier, pages: r.pages
   broken: r.broken_links, seo_score: r.seo_audit?.score, clicks: r.clicks, sessions: r.sessions, avg_position: r.avg_position,
   regressions: r._regressions, worst: r.worst }));
 
-const report = await callGemini(
+const report = await callLLM(
 `Write my weekly brand report across ${results.length} web properties (some are multi-page sites, so "pages" is how many were tracked). Structure:
 1) Headline: anything urgent FIRST — regressions, broken links, big drops.
 2) Full-insight sites (HoN, Portfolio + its apps): rankings + traffic + SEO + the weakest page (worst).

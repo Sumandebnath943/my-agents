@@ -3,7 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { downloadFileBase64 } from "../../lib/telegram-poll.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
@@ -26,9 +26,9 @@ export async function handleExpense(msg) {
   if (!msg.photoFileId) return false; // only act on photos
   const base64 = await downloadFileBase64(msg.photoFileId);
 
-  const out = await callGemini(
+  const out = await callLLM(
     `Extract the expense from this receipt photo. Fill every field; if one is unreadable, use your best guess.`,
-    { schema: EXPENSE_SCHEMA, images: [{ mimeType: "image/jpeg", base64 }] }
+    { schema: EXPENSE_SCHEMA, images: [{ mimeType: "image/jpeg", base64 }] } // images → vision chain (Gemini → GPT-4o)
   );
   const e = parseJson(out);
   await db.from("expenses").insert({

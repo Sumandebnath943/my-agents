@@ -5,7 +5,7 @@
 // Dedupes via kv so each failure is reported exactly once. Skips its OWN failures (no loops).
 import { env } from "../../lib/env.js";
 import { getState, setState } from "../../lib/store.js";
-import { callPrivate, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const REPO = process.env.GITHUB_REPOSITORY || "Sumandebnath943/my-agents";
@@ -51,7 +51,7 @@ for (const run of fresh.slice(0, MAX_PER_RUN)) {
   // 3) LLM diagnosis (best-effort — a bad/absent diagnosis still sends a useful alert).
   let diag = { cause: "", file: "", fix: "" };
   try {
-    const out = await callPrivate(
+    const out = await callLLM(
       [
         { role: "system", content: "You are a CI failure triager for a Node.js (ESM) agent fleet on GitHub Actions. Reply ONLY with JSON." },
         { role: "user", content: `A workflow run failed.\nWorkflow: ${run.name}\nFailed step: ${failedStep}\n\nLog tail:\n${log || "(no log available)"}\n\nReturn {"cause":"one-line root cause","file":"the single most likely file to fix, or ''","fix":"a concrete one-step fix suggestion"}.` },

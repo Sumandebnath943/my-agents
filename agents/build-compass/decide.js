@@ -5,7 +5,7 @@
 // dashboard (Start -> Finish -> report) and emails the ranked list.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
@@ -22,7 +22,7 @@ const items = raw
 
 const { data: ideas } = await db.from("ideas").select("*").order("score", { ascending: false });
 
-const out = await callGemini(
+const out = await callLLM(
   `You are my build strategist. Below is a WEEK of real demand data gathered from HN, Reddit, and
 Lobste.rs (posts + engagement + top comments).
 

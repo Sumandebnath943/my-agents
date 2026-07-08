@@ -1,6 +1,6 @@
 // agents/01-uptime/index.js
 import { SITES, SLOW_MS } from "./sites.js";
-import { callGroq } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -42,7 +42,7 @@ let body = results
   .join("\n");
 
 if (problems.length) {
-  const explanation = await callGroq([
+  const explanation = await callLLM([
     { role: "system", content: "You are an SRE. In 1-2 sentences each, give the most likely cause and first thing to check. Be specific and brief." },
     { role: "user", content: `These sites have issues:\n${problems.map((p) => `- ${p.name}: ${p.status} code=${p.code} err=${p.error || "none"}`).join("\n")}` },
   ]);

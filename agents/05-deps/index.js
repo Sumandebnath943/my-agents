@@ -1,7 +1,7 @@
 // agents/05-deps/index.js
 import { env } from "../../lib/env.js";
 import { OWNER, IGNORE } from "./repos.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail } from "../../lib/email-template.js";
 
@@ -79,7 +79,7 @@ for (const repo of repos) {
 if (!findings.length) {
   console.log("No outdated or vulnerable deps found.");
 } else {
-  const out = await callGemini(
+  const out = await callLLM(
     `You are a security-savvy lead dev. Group these outdated/vulnerable npm packages by urgency.
 Return ONLY JSON: {"security":[{"name":"","repo":"","note":""}],"major":[...],"minor":[...]}.
 - security = has known vulnerabilities (act now). major = major-version bump. minor = minor/patch bump.

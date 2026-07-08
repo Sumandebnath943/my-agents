@@ -4,7 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { getState } from "../../lib/store.js";
-import { callGemini } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail } from "../../lib/email-template.js";
 
@@ -48,7 +48,7 @@ const dossier = {
   top_ideas: ideas.map((i) => i.title),
 };
 
-const report = await callGemini(
+const report = await callLLM(
   `You are my weekly chief-of-staff. Using this week's data, write a warm but honest
 "state of you" review: (1) a 3-line summary of how the week went, (2) notable trends
 across work, mood, habits, and spending, (3) exactly three focus areas for next week.

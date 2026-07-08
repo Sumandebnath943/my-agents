@@ -7,7 +7,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { subredditsNew } from "../../lib/reddit.js";
-import { callGemini, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
@@ -51,7 +51,7 @@ if (!pool.length) { console.log("No opportunities fetched."); process.exit(0); }
 // Gemini screens for genuine fit + drafts a specific intro each (public data; big context).
 let items = [];
 try {
-  const picked = await callGemini(
+  const picked = await callLLM(
     `You screen opportunities for me and draft outreach. Me: ${ME}
 From the list, keep ONLY genuinely relevant, legitimate, PAID opportunities. For each, return JSON {"items":[{"kind":"freelance|collab|cofounder|hackathon|bounty|grant","title":"short label","url":"","draft":"a specific, warm, non-generic 3-4 sentence intro I could send, referencing THIS specific post and tying it to my background"}]}. If nothing genuinely fits, return {"items":[]}. Never spammy, never generic, at most 8 items.
 

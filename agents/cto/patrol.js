@@ -4,7 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { OWNER, IGNORE } from "../04-standup/repos.js";
-import { callGroq, parseJson } from "../../lib/llm.js";
+import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyTelegram, notifyTelegramDocument, tgEscape } from "../../lib/notify.js";
 import { getState, setState } from "../../lib/store.js";
 import { renderCtoPdf } from "./pdf.js";
@@ -43,7 +43,7 @@ function diffFrom(files) {
 }
 
 async function reviewRepo(repo, diff, commitSubjects) {
-  const review = await callGroq([
+  const review = await callLLM([
     { role: "system", content: `You are a senior staff engineer reviewing new commits in the repo "${repo}". Return JSON:
 {"verdict":"approve|comment|request_changes","summary":"1-2 lines on what changed and its quality","issues":[{"severity":"high|med|low","category":"security|performance|quality|duplication|docs|tests","note":"specific+actionable","where":"file/line hint"}]}.
 Flag real problems only: leaked secrets, injection, obvious perf issues, duplicated logic, missing error handling, undocumented public functions, code changed with no matching test. Skip nitpicks.` },

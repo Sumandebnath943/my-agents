@@ -2,7 +2,7 @@
 // Summarizes debits over the period with Groq (private) and emails a category breakdown.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { callGroq } from "../../lib/llm.js";
+import { callLLM } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
@@ -14,7 +14,7 @@ const { data } = await db.from("finance").select("*").eq("direction", "debit").g
 if (!data?.length) { console.log("No debits in period."); process.exit(0); }
 
 const total = data.reduce((s, r) => s + Number(r.amount || 0), 0);
-const summary = await callGroq([
+const summary = await callLLM([
   { role: "system", content: "Group these debits into spend categories, give a total per category and overall, and flag anything unusual. Plain, brief." },
   { role: "user", content: JSON.stringify(data.map((d) => ({ merchant: d.merchant, amount: d.amount }))) },
 ]);

@@ -9,8 +9,9 @@ import { run as critique } from "./critique/run.mjs";
 import { run as mcp } from "./mcp/run.mjs";
 import { run as tier } from "./tier/run.mjs";
 import { run as memory } from "./memory/run.mjs";
+import { run as llmRouting } from "./llm-routing/run.mjs";
 
-const suites = [routing, json, linkedin, critique, mcp, tier, memory];
+const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];
