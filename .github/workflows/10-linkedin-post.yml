@@ -25,6 +25,7 @@ jobs:
         env:
           AGENT_NAME: linkedin
           POST_ID: ${{ github.event.inputs.post_id }}
+          TOKEN_ENC_KEY: ${{ secrets.TOKEN_ENC_KEY }}
           LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
           LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
