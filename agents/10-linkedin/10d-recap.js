@@ -4,6 +4,7 @@ import { env } from "../../lib/env.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail } from "../../lib/email-template.js";
 import { openValue } from "../../lib/crypto.js";
+import { LINKEDIN_API_VERSION } from "../../lib/linkedin.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -21,7 +22,7 @@ async function engagement(urn) {
   if (!token?.access_token || !urn) return null;
   try {
     const r = await fetch(`https://api.linkedin.com/rest/socialActions/${encodeURIComponent(urn)}`, {
-      headers: { Authorization: `Bearer ${token.access_token}`, "LinkedIn-Version": "202506", "X-Restli-Protocol-Version": "2.0.0" },
+      headers: { Authorization: `Bearer ${token.access_token}`, "LinkedIn-Version": LINKEDIN_API_VERSION, "X-Restli-Protocol-Version": "2.0.0" },
     });
     if (!r.ok) return null;
     const j = await r.json();

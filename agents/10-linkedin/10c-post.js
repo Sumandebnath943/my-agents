@@ -7,6 +7,7 @@ import { env } from "../../lib/env.js";
 import { notifyEmail, notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { renderEmail, stripMarkdown } from "../../lib/email-template.js";
 import { sealValue, openValue } from "../../lib/crypto.js";
+import { LINKEDIN_API_VERSION } from "../../lib/linkedin.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
@@ -60,7 +61,7 @@ const res = await fetch("https://api.linkedin.com/rest/posts", {
   headers: {
     Authorization: `Bearer ${access}`,
     "Content-Type": "application/json",
-    "LinkedIn-Version": "202506",
+    "LinkedIn-Version": LINKEDIN_API_VERSION,
     "X-Restli-Protocol-Version": "2.0.0",
   },
   body: JSON.stringify({
