@@ -24,4 +24,13 @@ for (const [i, post] of posts.entries()) {
   if (r.action !== "skip") ok++;
 }
 console.log(`Seeded ${ok}/${posts.length} reference posts into voice memory.`);
+
+// FAIL the job when nothing was stored. lib/memory.js is best-effort (it swallows embedding and DB
+// errors and returns "skip"), so without this the workflow would exit green having saved NOTHING —
+// a false success that hides an embedding outage exactly like the retired-model 404 did.
+if (ok === 0) {
+  console.error(`FAILED: 0 of ${posts.length} exemplars were saved. Every remember() returned "skip", which means embeddings or the DB write failed — check the errors logged above.`);
+  process.exit(1);
+}
+if (ok < posts.length) console.warn(`WARNING: only ${ok}/${posts.length} saved — re-run to retry the rest.`);
 process.exit(0);
