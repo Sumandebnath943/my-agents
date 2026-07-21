@@ -12,6 +12,7 @@
 // all-clear so you can confirm the probe itself is alive.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
+import { getState, setState } from "../../lib/store.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { FRESHNESS, VECTOR_STORES, freshnessFinding, vectorFinding, buildReport } from "./probes.js";
 
@@ -45,9 +46,25 @@ async function vectorSample(table, field) {
   } catch (e) { return { error: e.message || String(e) }; }
 }
 
+// When a table was FIRST seen empty. A table that has never been written to isn't proof of failure
+// until it has stayed empty longer than its producer's cadence — a table created today whose agent
+// runs on Sunday is just waiting. Persisted so that judgement survives between daily runs.
+const emptySince = (await getState("integrity:empty_since", {})) || {};
+const nextEmptySince = { ...emptySince };
+
 const findings = [];
-for (const spec of FRESHNESS) findings.push(freshnessFinding(spec, await latestRow(spec.table, spec.column), now));
+for (const spec of FRESHNESS) {
+  const reading = await latestRow(spec.table, spec.column);
+  const f = freshnessFinding(spec, { ...reading, emptySince: emptySince[spec.table] || null }, now);
+  if (f?.first_empty) nextEmptySince[spec.table] = now.toISOString();       // start the clock
+  if (reading.latest) delete nextEmptySince[spec.table];                    // it has rows now — reset
+  findings.push(f);
+}
 for (const spec of VECTOR_STORES) findings.push(vectorFinding(spec, await vectorSample(spec.table, spec.field)));
+
+if (JSON.stringify(nextEmptySince) !== JSON.stringify(emptySince)) {
+  try { await setState("integrity:empty_since", nextEmptySince); } catch (e) { console.error("integrity: couldn't persist empty-since state:", e.message); }
+}
 
 const report = buildReport(findings, { digest: DIGEST });
 

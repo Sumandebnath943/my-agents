@@ -19,7 +19,22 @@ export function run() {
     { id: "exactly at limit -> healthy", check: () => freshnessFinding(spec, { latest: daysAgo(3) }, NOW) === null },
     { id: "past limit -> alert", check: () => freshnessFinding(spec, { latest: daysAgo(9) }, NOW)?.level === "alert" },
     { id: "alert names the age", check: () => freshnessFinding(spec, { latest: daysAgo(9) }, NOW).title.includes("9 days") },
-    { id: "empty table -> warn not alert", check: () => freshnessFinding(spec, { latest: null }, NOW)?.level === "warn" },
+    // --- empty-table grace (a brand-new table is waiting, not broken) ---
+    { id: "first time empty -> quiet, starts the clock", check: () => { const f = freshnessFinding(spec, { latest: null }, NOW); return f?.level === "unknown" && f.first_empty === true; } },
+    { id: "still empty inside grace -> quiet", check: () => freshnessFinding(spec, { latest: null, emptySince: daysAgo(2) }, NOW)?.level === "unknown" },
+    { id: "empty past the cadence -> warn", check: () => freshnessFinding(spec, { latest: null, emptySince: daysAgo(9) }, NOW)?.level === "warn" },
+    { id: "long-empty warning names the duration", check: () => freshnessFinding(spec, { latest: null, emptySince: daysAgo(9) }, NOW).title.includes("9 days") },
+    { id: "unparseable emptySince -> quiet not warn", check: () => freshnessFinding(spec, { latest: null, emptySince: "nonsense" }, NOW)?.level === "unknown" },
+    // --- the live false alarm this probe produced on its first real run ---
+    { id: "missing COLUMN is a probe misconfig, not a missing table", check: () => {
+        const f = freshnessFinding(spec, { error: 'column llm_metrics.created_at does not exist' }, NOW);
+        return f?.level === "warn" && /misconfigured/i.test(f.title) && !/is missing/i.test(f.title);
+      } },
+    { id: "misconfig names the offending column", check: () => freshnessFinding(spec, { error: "column x.y does not exist" }, NOW).detail.includes("`created_at`") },
+    { id: "missing TABLE still detected (not swallowed by the column rule)", check: () => {
+        const f = freshnessFinding(setupSpec, { error: 'relation "public.linkedin_engagement" does not exist' }, NOW);
+        return f?.level === "alert" && /Table .* is missing/.test(f.title);
+      } },
     { id: "missing table w/ setup sql -> alert", check: () => freshnessFinding(setupSpec, { error: 'relation "public.linkedin_engagement" does not exist' }, NOW)?.level === "alert" },
     { id: "missing-table alert names the sql file", check: () => freshnessFinding(setupSpec, { error: "does not exist" }, NOW).detail.includes("sql/linkedin_engagement.sql") },
     { id: "PostgREST schema-cache wording detected", check: () => freshnessFinding(setupSpec, { error: "Could not find the table 'public.x' in the schema cache" }, NOW)?.level === "alert" },
@@ -29,7 +44,7 @@ export function run() {
     { id: "network error -> unknown", check: () => freshnessFinding(spec, { error: "fetch failed" }, NOW)?.level === "unknown" },
     { id: "unparseable timestamp -> unknown", check: () => freshnessFinding(spec, { latest: "yesterday-ish" }, NOW)?.level === "unknown" },
     { id: "future timestamp -> healthy not alert", check: () => freshnessFinding(spec, { latest: daysAgo(-5) }, NOW) === null },
-    { id: "null reading -> warn (treated as empty)", check: () => freshnessFinding(spec, null, NOW)?.level === "warn" },
+    { id: "null reading -> quiet (treated as first-empty)", check: () => freshnessFinding(spec, null, NOW)?.level === "unknown" },
   ], (c) => ({ ok: c.check() }));
 
   const vspec = VECTOR_STORES[0];
@@ -68,6 +83,10 @@ export function run() {
     { id: "every vector store is complete", check: () => VECTOR_STORES.every((s) => s.table && s.field && s.why && s.fix) },
     { id: "watches the new engagement table", check: () => FRESHNESS.some((s) => s.table === "linkedin_engagement") },
     { id: "watches both vector stores", check: () => VECTOR_STORES.map((s) => s.table).join() === "agent_memories,mas_memory" },
+    // Locks in the real-world miss: llm_metrics/ops_events timestamp with `ts`, everything else
+    // with created_at/updated_at/sampled_at. A wrong column silently stops checking that table.
+    { id: "llm_metrics uses the `ts` column", check: () => FRESHNESS.find((s) => s.table === "llm_metrics").column === "ts" },
+    { id: "no spec uses a suspicious column name", check: () => FRESHNESS.every((s) => ["ts", "created_at", "updated_at", "sampled_at"].includes(s.column)) },
   ], (c) => ({ ok: c.check() }));
 
   return [fresh, vec, rep, cfg];

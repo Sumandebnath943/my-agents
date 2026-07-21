@@ -13,7 +13,10 @@
 
 /** Freshness expectations. A table that stops receiving rows is the cheapest silent-failure signal. */
 export const FRESHNESS = [
-  { table: "llm_metrics",          column: "created_at", maxAgeDays: 3,  why: "every LLM call logs here — silence means attribution/metrics broke, or no agent has run" },
+  // NOTE: llm_metrics and ops_events timestamp their rows with `ts`, not `created_at` — getting
+  // this wrong made the probe's first live run report "table is missing" for a table that was
+  // perfectly healthy. Always confirm the column against the writer before adding a spec.
+  { table: "llm_metrics",          column: "ts",         maxAgeDays: 3,  why: "every LLM call logs here — silence means attribution/metrics broke, or no agent has run" },
   { table: "agent_outputs",        column: "created_at", maxAgeDays: 3,  why: "every Telegram/email is mirrored here — silence means notify logging broke" },
   { table: "linkedin_posts",       column: "created_at", maxAgeDays: 14, why: "the LinkedIn autopilot drafts here" },
   { table: "linkedin_engagement",  column: "sampled_at", maxAgeDays: 14, why: "the Sunday recap samples engagement here", setupSql: "sql/linkedin_engagement.sql" },
@@ -39,13 +42,24 @@ export function ageInDays(iso, now = new Date()) {
 /**
  * Turn one freshness reading into a finding (or null when healthy).
  * @param {{table,column,maxAgeDays,why,setupSql?}} spec
- * @param {{latest?:string|null, error?:string|null}} reading
+ * @param {{latest?:string|null, error?:string|null, emptySince?:string|null}} reading
+ *        `emptySince` = when this table was FIRST observed empty (kv `integrity:empty_since`).
  */
 export function freshnessFinding(spec, reading, now = new Date()) {
-  const { latest = null, error = null } = reading || {};
+  const { latest = null, error = null, emptySince = null } = reading || {};
 
   if (error) {
-    // "table does not exist" is a real, actionable finding — usually a setup SQL that was never run.
+    // A MISSING COLUMN is a bug in this probe's own config, not evidence the fleet is broken.
+    // PostgREST words it "column x.y does not exist", which also matches the table test below —
+    // so it must be checked FIRST or a mis-specced column masquerades as a missing table.
+    if (/column\b/i.test(error)) {
+      return {
+        level: "warn", table: spec.table,
+        title: `Integrity probe is misconfigured for \`${spec.table}\``,
+        detail: `Column \`${spec.column}\` doesn't exist, so this table isn't actually being checked. ${error.slice(0, 100)}`,
+      };
+    }
+    // A genuinely missing TABLE is actionable — usually a setup SQL that was never run.
     if (/does not exist|could not find the table|schema cache/i.test(error)) {
       return {
         level: spec.setupSql ? "alert" : "warn",
@@ -59,7 +73,17 @@ export function freshnessFinding(spec, reading, now = new Date()) {
   }
 
   if (!latest) {
-    return { level: "warn", table: spec.table, title: `\`${spec.table}\` is empty`, detail: `No rows at all. ${spec.why}.` };
+    // An empty table is only evidence of failure once it has STAYED empty longer than the
+    // producing agent's cadence. A table created 5 minutes ago whose writer runs on Sunday is
+    // simply waiting — warning about it is a false alarm, and false alarms get the channel muted.
+    if (!emptySince) {
+      return { level: "unknown", table: spec.table, first_empty: true, title: `\`${spec.table}\` is empty (first seen)`, detail: `Waiting up to ${spec.maxAgeDays}d for its first row before flagging this.` };
+    }
+    const emptyFor = ageInDays(emptySince, now);
+    if (emptyFor === null || emptyFor <= spec.maxAgeDays) {
+      return { level: "unknown", table: spec.table, title: `\`${spec.table}\` still empty`, detail: `Empty for ${emptyFor ?? "?"}d of an allowed ${spec.maxAgeDays}d.` };
+    }
+    return { level: "warn", table: spec.table, title: `\`${spec.table}\` has been empty for ${emptyFor} days`, detail: `Nothing has ever been written. ${spec.why}.` };
   }
 
   const age = ageInDays(latest, now);
