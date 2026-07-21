@@ -7,7 +7,7 @@
     "hello": "node agents/00-hello/index.js",
     "mcp": "node mcp/server.js",
     "linkedin:seed-voice": "node agents/10-linkedin/seed-voice.js",
-    "check": "node --check lib/llm.js && node --check lib/routing.js && node --check lib/store.js && node --check lib/critique.js && node --check lib/tier.js && node --check lib/memory.js && node --check lib/scrape.js && node --check lib/search.js && node --check mcp/server.js && node --check agents/inbox-router/route.js && node --check agents/30-browser/index.js && node --check agents/31-selfheal/index.js && node --check agents/25-skillgap/signals.js && node --check agents/25-skillgap/index.js && node --check agents/19-review/dossier.js && node --check agents/19-review/index.js && node --check agents/10-linkedin/engagement.js && node --check agents/10-linkedin/10d-recap.js && node --check agents/32-integrity/probes.js && node --check agents/32-integrity/index.js",
+    "check": "node --check lib/llm.js && node --check lib/routing.js && node --check lib/store.js && node --check lib/critique.js && node --check lib/tier.js && node --check lib/memory.js && node --check lib/scrape.js && node --check lib/search.js && node --check mcp/server.js && node --check agents/inbox-router/route.js && node --check agents/30-browser/index.js && node --check agents/31-selfheal/index.js && node --check agents/25-skillgap/signals.js && node --check agents/25-skillgap/index.js && node --check agents/19-review/dossier.js && node --check agents/19-review/index.js && node --check agents/10-linkedin/engagement.js && node --check agents/10-linkedin/10d-recap.js && node --check agents/32-integrity/probes.js && node --check agents/32-integrity/index.js && node --check agents/10-linkedin/winners.js && node --check agents/10-linkedin/10a-draft.js && node --check agents/16-expenses/reconcile.js && node --check agents/16-expenses/sweep.js && node --check agents/16-expenses/handle.js && node --check agents/20-finance/digest.js && node --check agents/33-calendar/calendar.js && node --check agents/33-calendar/index.js",
     "eval:routing": "node evals/routing/run.mjs",
     "eval:json": "node evals/json/run.mjs",
     "eval:linkedin": "node evals/linkedin/run.mjs",
@@ -20,6 +20,9 @@
     "eval:review": "node evals/review/run.mjs",
     "eval:engagement": "node evals/engagement/run.mjs",
     "eval:integrity": "node evals/integrity/run.mjs",
+    "eval:winners": "node evals/winners/run.mjs",
+    "eval:reconcile": "node evals/reconcile/run.mjs",
+    "eval:calendar": "node evals/calendar/run.mjs",
     "eval:all": "node evals/run-all.mjs",
     "eval:finance": "echo \"Finance classifier + eval live in the agents-dashboard repo: node scripts/finance-eval.mjs\""
   },

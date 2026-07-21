@@ -1,0 +1,40 @@
+# .github/workflows/33-calendar.yml
+# Calendar — the fleet's time-awareness. Sends the day's agenda each morning and parks a compact
+# summary in kv (calendar:today / calendar:week) so other agents can reason about load without
+# needing Google credentials. Reuses the same free service-account JWT as the Brand Manager.
+#
+# ONE-TIME SETUP: share your Google Calendar with the service account's client_email
+# (Calendar → Settings → Share with specific people → "See all event details") and enable the
+# Google Calendar API in the Cloud project. Without that the agent fails LOUDLY rather than
+# reporting an empty day.
+name: Calendar
+on:
+  schedule:
+    - cron: "15 2 * * *"   # 07:45 IST — before the standup/briefing land
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 33-calendar-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  agenda:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/33-calendar/index.js
+        env:
+          AGENT_NAME: calendar
+          # Manual run always reports, even on a free day, so you can confirm setup worked.
+          DIGEST: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+          GOOGLE_SA_JSON: ${{ secrets.GOOGLE_SA_JSON }}
+          GOOGLE_CALENDAR_IDS: ${{ secrets.GOOGLE_CALENDAR_IDS }}
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

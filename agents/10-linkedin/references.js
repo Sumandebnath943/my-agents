@@ -29,12 +29,16 @@ export const REFERENCE_POSTS = loadReferencePosts();
 
 // Renders the reference posts as a labelled few-shot block for the draft prompt. Returns "" when
 // no references exist, so the prompt stays clean until real exemplars are added.
-export function referenceBlock() {
+// `count` lets the caller make room for higher-signal exemplars: once the drafter has enough of
+// Suman's OWN top-performing posts (see winners.js), it shows fewer of these generic references so
+// the prompt doesn't balloon.
+export function referenceBlock(count = 8) {
   const posts = REFERENCE_POSTS.map((p) => String(p).trim()).filter(Boolean);
   if (!posts.length) return "";
+  const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 8;
   // Rotate a random subset each run so every exemplar gets used over time (variety of shapes),
   // while capping tokens per prompt.
-  const shown = [...posts].sort(() => Math.random() - 0.5).slice(0, 8);
+  const shown = [...posts].sort(() => Math.random() - 0.5).slice(0, n);
   return `\n\nSTYLE EXEMPLARS — these are real posts in MY voice. Match their RHYTHM, LINE-BREAK CADENCE, sentence length, hook style, and how they land a close. Imitate the FORM, never the content or claims — the subject matter must be today's news, not theirs. IGNORE any promotional CTAs, external links, @mentions, hashtags, or "follow/register/join my community" lines in these exemplars — those are NOT part of the style to copy. This cadence is non-negotiable; when in doubt, format like these:\n${shown
     .map((p, i) => `--- EXEMPLAR ${i + 1} ---\n${p}`)
     .join("\n\n")}\n--- END EXEMPLARS ---`;

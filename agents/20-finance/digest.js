@@ -5,10 +5,18 @@ import { env } from "../../lib/env.js";
 import { callLLM } from "../../lib/llm.js";
 import { notifyEmail } from "../../lib/notify.js";
 import { renderEmail, mdToHtml } from "../../lib/email-template.js";
+import { sweep } from "../16-expenses/sweep.js";
 
 const period = process.argv[2] === "month" ? 30 : 7;
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 const since = new Date(Date.now() - period * 86400000).toISOString().slice(0, 10);
+
+// Re-try receipt↔ledger matching before reporting. Runs BEFORE the early exit below so receipts
+// still get reconciled in a quiet period. Best-effort: if sql/expenses_reconcile.sql hasn't been
+// run this no-ops. Receipts never become transactions — this only links and fills blanks.
+const rec = await sweep(db);
+if (rec.error) console.error(`receipt reconciliation: ${rec.error} — has sql/expenses_reconcile.sql been run?`);
+else console.log(`receipt reconciliation: checked ${rec.checked} — ${rec.counts.linked} linked, ${rec.counts.pending} still waiting, ${rec.counts.unmatched} unmatched, ${rec.counts.ambiguous} ambiguous.`);
 
 const { data } = await db.from("finance").select("*").eq("direction", "debit").gte("spent_on", since);
 if (!data?.length) { console.log("No debits in period."); process.exit(0); }

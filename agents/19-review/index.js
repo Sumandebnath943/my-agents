@@ -46,8 +46,12 @@ const [journal, expenses, finance, habits, reading, ideas, jobs, skills, builds,
   q(async () => (await db.from("resume_reports").select("score,score_out_of,created_at").order("created_at", { ascending: false }).limit(1)).data),
 ]);
 
+// Next week's load, parked in kv by the Calendar agent (#33) so this doesn't need Google creds.
+// Absent until that agent runs — the review simply won't mention the calendar.
+const calendar = await q(async () => (await db.from("kv").select("value").eq("key", "calendar:week").maybeSingle()).data?.value);
+
 const dossier = buildDossier({ journal, expenses, finance, habits, reading, ideas, jobs, skills,
-  builds, opportunities, launches, posts, reviews, brand, resumes });
+  builds, opportunities, launches, posts, reviews, brand, resumes, calendar });
 
 if (!hasAnyData(dossier)) {
   console.log("No data anywhere this week; skipping review.");

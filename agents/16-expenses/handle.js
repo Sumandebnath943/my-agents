@@ -5,6 +5,7 @@ import { env } from "../../lib/env.js";
 import { downloadFileBase64 } from "../../lib/telegram-poll.js";
 import { callLLM, parseJson } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
+import { reconcileOne } from "./sweep.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
 
@@ -31,12 +32,23 @@ export async function handleExpense(msg) {
     { schema: EXPENSE_SCHEMA, images: [{ mimeType: "image/jpeg", base64 }] } // images → vision chain (Gemini → GPT-4o)
   );
   const e = parseJson(out);
-  await db.from("expenses").insert({
+  const { data: inserted } = await db.from("expenses").insert({
     merchant: e.merchant, amount: e.amount, currency: e.currency,
     category: e.category, spent_on: e.spent_on,
-  });
+  }).select("id").maybeSingle();
+
+  // Try to attach this receipt to the bank debit for the same purchase. If the SMS hasn't arrived
+  // yet this stays `pending` and the weekly sweep retries it. The receipt NEVER becomes a
+  // transaction — the ledger (finance) remains the only thing that counts toward spend.
+  const rec = await reconcileOne(db, { id: inserted?.id, merchant: e.merchant, amount: e.amount, category: e.category, spent_on: e.spent_on });
+  const linkNote = rec.status === "linked"
+    ? "\n🔗 Matched to your bank debit"
+    : rec.status === "ambiguous"
+    ? "\n⚠️ Two bank debits match — review on the dashboard"
+    : "\n⏳ No bank debit yet — will re-check";
+
   await notifyTelegram(
-    `💸 <b>Expense logged</b>\n${tgEscape(e.merchant)} — ${tgEscape(e.currency)} ${tgEscape(e.amount)}\n📁 ${tgEscape(e.category)}`,
+    `💸 <b>Expense logged</b>\n${tgEscape(e.merchant)} — ${tgEscape(e.currency)} ${tgEscape(e.amount)}\n📁 ${tgEscape(e.category)}${linkNote}`,
     { html: true }
   );
   return true;

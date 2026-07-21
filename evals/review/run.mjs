@@ -8,7 +8,7 @@
 //     entry used to be skipped entirely, sending no email at all.
 import "../_env.mjs";
 import { runCases, isMain } from "../_lib.mjs";
-import { buildDossier, hasAnyData, spendSummary, jobSummary, reviewSummary, brandSummary, postSummary } from "../../agents/19-review/dossier.js";
+import { buildDossier, hasAnyData, spendSummary, jobSummary, reviewSummary, brandSummary, postSummary, calendarSummary } from "../../agents/19-review/dossier.js";
 
 export function run() {
   // --- spend: the headline correctness fix ------------------------------------------------------
@@ -77,6 +77,13 @@ export function run() {
     { id: "posts split posted vs awaiting", check: () => { const p = postSummary([{ status: "posted", headline: "a" }, { status: "awaiting" }]); return p.posted === 1 && p.awaiting === 1 && p.headlines[0] === "a"; } },
     { id: "dossier never throws on junk", check: () => { const d = buildDossier({ journal: [null], finance: [null], reviews: [null], brand: [null], jobs: [null] }); return typeof d === "object" && d.spend.total === 0; } },
     { id: "dossier is JSON-serialisable", check: () => typeof JSON.stringify(buildDossier(emptyish)) === "string" },
+    // Calendar comes from kv `calendar:week`, parked by agent #33.
+    { id: "calendar absent -> null, not a fake empty week", check: () => calendarSummary(undefined) === null && calendarSummary(null) === null },
+    { id: "calendar summarised", check: () => { const c = calendarSummary({ meetings: 4, busyHours: 6.5, events: [{ title: "Standup", start: "x" }] }); return c.meetings === 4 && c.booked_hours === 6.5 && c.next_up[0].title === "Standup"; } },
+    { id: "calendar caps next_up at 5", check: () => calendarSummary({ meetings: 9, busyHours: 1, events: Array.from({ length: 9 }, (_, i) => ({ title: `E${i}` })) }).next_up.length === 5 },
+    { id: "calendar tolerates junk", check: () => { const c = calendarSummary({ meetings: "x", events: "nope" }); return c.meetings === 0 && c.next_up.length === 0; } },
+    { id: "calendar reaches the dossier", check: () => buildDossier({ ...emptyish, calendar: { meetings: 3, busyHours: 2, events: [] } }).calendar.meetings === 3 },
+    { id: "a calendar alone does NOT trigger a review", check: () => hasAnyData(buildDossier({ ...emptyish, calendar: { meetings: 3, busyHours: 2, events: [] } })) === false },
   ];
   const agg = runCases("review · fleet aggregation", aggCases, (c) => ({ ok: c.check() }));
 

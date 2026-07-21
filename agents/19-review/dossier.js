@@ -156,6 +156,22 @@ export function buildDossier(d = {}) {
     code: reviewSummary(d.reviews),
     brand: brandSummary(d.brand),
     resume: resumes.length ? { score: resumes[0].score, out_of: resumes[0].score_out_of } : null,
+    calendar: calendarSummary(d.calendar),
+  };
+}
+
+/**
+ * Next week's commitments, as parked in kv `calendar:week` by the Calendar agent (#33).
+ * Null when that agent hasn't run — the review then just doesn't mention the calendar, rather
+ * than implying an empty week.
+ */
+export function calendarSummary(cal) {
+  if (!cal || typeof cal !== "object") return null;
+  const events = Array.isArray(cal.events) ? cal.events : [];
+  return {
+    meetings: Number(cal.meetings) || 0,
+    booked_hours: Number(cal.busyHours) || 0,
+    next_up: events.slice(0, 5).map((e) => ({ title: e?.title || "(untitled)", start: e?.start || null })),
   };
 }
 
