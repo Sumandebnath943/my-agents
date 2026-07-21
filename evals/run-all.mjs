@@ -10,8 +10,10 @@ import { run as mcp } from "./mcp/run.mjs";
 import { run as tier } from "./tier/run.mjs";
 import { run as memory } from "./memory/run.mjs";
 import { run as llmRouting } from "./llm-routing/run.mjs";
+import { run as skillgap } from "./skillgap/run.mjs";
+import { run as review } from "./review/run.mjs";
 
-const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting];
+const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];

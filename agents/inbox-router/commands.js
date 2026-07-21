@@ -3,7 +3,6 @@
 // Each handler receives the parsed args array and replies via Telegram.
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
-import { getState } from "../../lib/store.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { generateNotes } from "../14-notes/generate.js";
 import { addIdea, listIdeas } from "../18-ideas/ideas.js";
@@ -84,13 +83,21 @@ async function ideas() {
   return notifyTelegram(`💡 <b>Idea backlog</b>\n\n${body}`, { html: true });
 }
 
+// Drafts live in the `linkedin_posts` table (status 'awaiting'). This used to read the kv list
+// `linkedin:queue`, which the LinkedIn Autopilot stopped writing when it moved to the table — so
+// /drafts silently answered "none" even with drafts waiting for approval.
 async function drafts() {
-  const q = (await getState("linkedin:queue", [])) || [];
-  const pending = q.filter((d) => d.status === "pending");
+  const { data } = await db().from("linkedin_posts")
+    .select("id,headline,post,created_at")
+    .eq("status", "awaiting")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  const pending = data || [];
   if (!pending.length) return notifyTelegram(`📝 <b>Drafts</b>\nNo pending LinkedIn drafts.`, { html: true });
   await notifyTelegram(`📝 <b>${pending.length} pending draft(s)</b>`, { html: true });
-  for (const d of pending.slice(-5)) {
-    await notifyTelegram(`<i>id ${d.id}</i>\n\n${tgEscape(d.text)}`, { html: true });
+  for (const d of pending.slice(0, 5)) {
+    const head = d.headline ? ` — ${tgEscape(d.headline)}` : "";
+    await notifyTelegram(`<i>id ${d.id}</i>${head}\n\n${tgEscape(d.post || "")}`, { html: true });
   }
 }
 
