@@ -10,6 +10,7 @@ import { chromium } from "playwright";
 import { getState, setState } from "../../lib/store.js";
 import { callLLM } from "../../lib/llm.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
+import { isUrlSafe } from "../../lib/scrape.js";
 
 const watchlist = (await getState("browser:watchlist", [])) || [];
 if (!watchlist.length) { console.log("browser: watchlist empty — nothing to watch."); process.exit(0); }
@@ -20,6 +21,10 @@ try {
   for (const target of watchlist.slice(0, 10)) {
     const { id, url, question } = target || {};
     if (!id || !url) continue;
+    // Authoritative SSRF check (DNS-resolving) immediately before we navigate. The dashboard
+    // validates structurally when a target is saved, but a hostname's DNS can change afterwards —
+    // this is the guard that actually protects the runner.
+    if (!(await isUrlSafe(url))) { console.error(`browser: target ${id} skipped — unsafe or unresolvable URL.`); continue; }
     try {
       const page = await browser.newPage({ userAgent: "Mozilla/5.0 (compatible; MigiWebWatch/1.0)" });
       await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });

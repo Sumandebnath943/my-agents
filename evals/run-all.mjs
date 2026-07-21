@@ -12,8 +12,10 @@ import { run as memory } from "./memory/run.mjs";
 import { run as llmRouting } from "./llm-routing/run.mjs";
 import { run as skillgap } from "./skillgap/run.mjs";
 import { run as review } from "./review/run.mjs";
+import { run as engagement } from "./engagement/run.mjs";
+import { run as integrity } from "./integrity/run.mjs";
 
-const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review];
+const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, integrity];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];

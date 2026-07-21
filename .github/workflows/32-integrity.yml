@@ -1,0 +1,36 @@
+# .github/workflows/32-integrity.yml
+# Integrity Probe — the silent-success detector. Checks that tables which SHOULD be receiving rows
+# actually are, and that no vector store is holding rows without their embedding (the failure shape
+# behind the 2026-07 ECHO/MAS outage). No LLM, no cost — just a handful of Supabase reads.
+# Quiet unless something is wrong; run it manually with DIGEST=1 for an all-clear.
+name: Integrity Probe
+on:
+  schedule:
+    - cron: "50 6 * * *"   # daily 12:20 IST — off the hour, away from the other crons
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 32-integrity-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/32-integrity/index.js
+        env:
+          AGENT_NAME: integrity
+          # Manual run = you want confirmation, so always send the all-clear. Scheduled runs stay
+          # quiet unless something is actually wrong. (Deliberately not a workflow input: a
+          # `type: boolean` input arrives as the STRING "false" via github.event.inputs, which is
+          # truthy in GitHub expressions — an easy way to make this noisy by accident.)
+          DIGEST: ${{ github.event_name == 'workflow_dispatch' && '1' || '' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
