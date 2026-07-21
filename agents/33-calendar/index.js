@@ -16,7 +16,7 @@ import { env } from "../../lib/env.js";
 import { googleToken } from "../../lib/google-auth.js";
 import { getState, setState } from "../../lib/store.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
-import { normalizeEvents, summarizeDay, formatAgenda, explainError, dayRange, TZ } from "./calendar.js";
+import { normalizeEvents, summarizeDay, formatAgenda, explainError, describeVisibleCalendars, dayRange, TZ } from "./calendar.js";
 
 const CAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
 // Which calendars to read. A service account's own "primary" is empty, so this must be the
@@ -59,9 +59,19 @@ for (const id of CALENDAR_IDS) {
 
 // EVERY calendar failed → this is a setup/permissions problem, not an empty week. Say so loudly;
 // silently reporting "nothing scheduled" is exactly the false-success this fleet keeps eliminating.
+// And don't just report the failure — probe what the service account CAN see, so the message
+// diagnoses the cause instead of leaving it to another round of guessing.
 if (failures.length === CALENDAR_IDS.length) {
-  await notifyTelegram(`📅 <b>Calendar unavailable</b>\n${tgEscape(failures[0])}`, { html: true });
-  console.error("calendar: all calendars failed —", failures.join(" | "));
+  let diagnosis = "";
+  try {
+    const r = await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=20", { headers: { Authorization: `Bearer ${token}` } });
+    diagnosis = r.ok
+      ? describeVisibleCalendars((await r.json()).items)
+      : `Couldn't list the service account's calendars either (${r.status}) — if that's 403, enable the Google Calendar API in the "${saEmail.split("@")[1]?.split(".")[0] || "same"}" Cloud project.`;
+  } catch (e) { diagnosis = `Diagnostic probe failed: ${e.message}`; }
+
+  await notifyTelegram(`📅 <b>Calendar unavailable</b>\n${tgEscape(failures[0])}\n\n<b>Diagnosis</b>\n${tgEscape(diagnosis)}`, { html: true });
+  console.error("calendar: all calendars failed —", failures.join(" | "), "|", diagnosis);
   process.exit(1);
 }
 if (failures.length) console.error("calendar: some calendars failed —", failures.join(" | "));

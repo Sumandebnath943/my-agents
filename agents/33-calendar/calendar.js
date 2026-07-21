@@ -122,6 +122,23 @@ export function formatAgenda(events, summary, { esc = (s) => String(s), tz = TZ 
  * calendar, so the overwhelmingly likely cause of 403/404 is that the calendar was never SHARED
  * with it — which would otherwise look exactly like "you have no meetings today".
  */
+/**
+ * Report what the service account can ACTUALLY see.
+ *
+ * "Calendar not found" is ambiguous on its own — it can't distinguish "you shared the wrong
+ * calendar", "the share silently didn't save", and "the id is wrong". Listing the service
+ * account's own calendarList settles it in one line, so the next run diagnoses itself instead of
+ * costing another round of guessing.
+ */
+export function describeVisibleCalendars(items) {
+  const list = (Array.isArray(items) ? items : []).filter(Boolean);
+  if (!list.length) {
+    return "The service account currently has access to NO calendars at all — the share hasn't reached it. In Google Calendar, re-check that its address is listed under “Share with specific people” on the calendar itself (not under Settings → general), with “See all event details”.";
+  }
+  const shown = list.slice(0, 10).map((c) => `• ${c.id}${c.accessRole ? ` (${c.accessRole})` : ""}`).join("\n");
+  return `The service account CAN see ${list.length} calendar(s):\n${shown}\n\nUse one of those ids — set GOOGLE_CALENDAR_IDS to it if it isn't your MY_EMAIL address.`;
+}
+
 export function explainError(status, calendarId, saEmail = "the service account") {
   if (status === 404) return `Calendar "${calendarId}" not found. Share it with ${saEmail} (Google Calendar → Settings → Share with specific people → See all event details).`;
   if (status === 403) return `Access denied for "${calendarId}". Either the Calendar API isn't enabled in the Google Cloud project, or the calendar isn't shared with ${saEmail}.`;

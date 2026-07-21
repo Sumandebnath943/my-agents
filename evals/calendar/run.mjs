@@ -6,7 +6,7 @@
 // look like a midnight meeting that blocks the entire day.
 import "../_env.mjs";
 import { runCases, isMain } from "../_lib.mjs";
-import { parseEvent, normalizeEvents, summarizeDay, formatAgenda, explainError, dayRange } from "../../agents/33-calendar/calendar.js";
+import { parseEvent, normalizeEvents, summarizeDay, formatAgenda, explainError, describeVisibleCalendars, dayRange } from "../../agents/33-calendar/calendar.js";
 
 const timed = (id, startIso, mins, extra = {}) => ({
   id, status: "confirmed", summary: `Event ${id}`,
@@ -77,6 +77,13 @@ export function run() {
     { id: "403 mentions API + sharing", check: () => /Calendar API isn't enabled/.test(explainError(403, "me@x.com")) },
     { id: "401 points at the credentials", check: () => /GOOGLE_SA_JSON/.test(explainError(401, "me@x.com")) },
     { id: "unknown status still names the calendar", check: () => explainError(500, "me@x.com").includes("me@x.com") },
+    // "not found" alone can't distinguish a bad id from a share that never applied — the probe must.
+    { id: "no visible calendars -> says the share never landed", check: () => /NO calendars at all/.test(describeVisibleCalendars([])) },
+    { id: "empty probe is still actionable", check: () => /Share with specific people/.test(describeVisibleCalendars(null)) },
+    { id: "visible calendars are listed with their ids", check: () => describeVisibleCalendars([{ id: "a@b.c", accessRole: "reader" }]).includes("a@b.c") },
+    { id: "shows the access role", check: () => describeVisibleCalendars([{ id: "a@b.c", accessRole: "reader" }]).includes("(reader)") },
+    { id: "points at GOOGLE_CALENDAR_IDS when ids differ", check: () => describeVisibleCalendars([{ id: "a@b.c" }]).includes("GOOGLE_CALENDAR_IDS") },
+    { id: "caps a long list at 10", check: () => (describeVisibleCalendars(Array.from({ length: 25 }, (_, i) => ({ id: `c${i}@x.y` }))).match(/•/g) || []).length === 10 },
   ], (c) => ({ ok: c.check() }));
 
   // The day window must be anchored to IST, not to whatever timezone the runner happens to use.
