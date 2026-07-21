@@ -78,8 +78,15 @@ export function run() {
     { id: "401 points at the credentials", check: () => /GOOGLE_SA_JSON/.test(explainError(401, "me@x.com")) },
     { id: "unknown status still names the calendar", check: () => explainError(500, "me@x.com").includes("me@x.com") },
     // "not found" alone can't distinguish a bad id from a share that never applied — the probe must.
-    { id: "no visible calendars -> says the share never landed", check: () => /NO calendars at all/.test(describeVisibleCalendars([])) },
-    { id: "empty probe is still actionable", check: () => /Share with specific people/.test(describeVisibleCalendars(null)) },
+    // An empty list must NOT be reported as a failed share — it's normal for a service account,
+    // and saying otherwise sends the owner to re-do a step that was already correct.
+    { id: "empty list is not blamed on the share", check: () => {
+        const m = describeVisibleCalendars([]);
+        return !/the share hasn't reached it/i.test(m) && /does not mean sharing failed/i.test(m);
+      } },
+    { id: "empty list is explained as normal", check: () => /NORMAL/.test(describeVisibleCalendars([])) },
+    { id: "empty list points at the calendar ID", check: () => /Calendar ID/.test(describeVisibleCalendars([])) && /GOOGLE_CALENDAR_IDS/.test(describeVisibleCalendars([])) },
+    { id: "warns the id may differ from the email address", check: () => /NOT the same account/.test(describeVisibleCalendars(null)) },
     { id: "visible calendars are listed with their ids", check: () => describeVisibleCalendars([{ id: "a@b.c", accessRole: "reader" }]).includes("a@b.c") },
     { id: "shows the access role", check: () => describeVisibleCalendars([{ id: "a@b.c", accessRole: "reader" }]).includes("(reader)") },
     { id: "points at GOOGLE_CALENDAR_IDS when ids differ", check: () => describeVisibleCalendars([{ id: "a@b.c" }]).includes("GOOGLE_CALENDAR_IDS") },

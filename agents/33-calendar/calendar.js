@@ -133,7 +133,12 @@ export function formatAgenda(events, summary, { esc = (s) => String(s), tz = TZ 
 export function describeVisibleCalendars(items) {
   const list = (Array.isArray(items) ? items : []).filter(Boolean);
   if (!list.length) {
-    return "The service account currently has access to NO calendars at all — the share hasn't reached it. In Google Calendar, re-check that its address is listed under “Share with specific people” on the calendar itself (not under Settings → general), with “See all event details”.";
+    // An empty calendarList is NOT evidence that sharing failed. Sharing a calendar with a service
+    // account grants ACL access but does NOT subscribe it, so a correctly-shared calendar never
+    // appears here — while direct events access still works. The earlier version of this message
+    // concluded "the share hasn't reached it", which sent the owner back to re-do a step they had
+    // already done correctly; the real cause was a wrong calendar id.
+    return "The service account's own calendar list is empty — which is NORMAL and does not mean sharing failed (a shared calendar is never auto-subscribed for a service account). So this points at the calendar ID, not the share. Open that calendar's “Settings and sharing”: the Owner row, and “Integrate calendar → Calendar ID”, show the address to use — it is often NOT the same account you receive fleet email on. Set GOOGLE_CALENDAR_IDS to it.";
   }
   const shown = list.slice(0, 10).map((c) => `• ${c.id}${c.accessRole ? ` (${c.accessRole})` : ""}`).join("\n");
   return `The service account CAN see ${list.length} calendar(s):\n${shown}\n\nUse one of those ids — set GOOGLE_CALENDAR_IDS to it if it isn't your MY_EMAIL address.`;
