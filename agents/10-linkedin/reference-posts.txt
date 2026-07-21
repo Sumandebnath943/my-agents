@@ -1,0 +1,359 @@
+Ref1:
+This is genuinely one of the most powerful Claude stories I have come across.
+
+A 62 year old man in India had severe migraines for 25 years. Only when lying down. Neurologists. Nephrologists. Brain MRIs. Blood thinners.
+
+Nobody could explain it.
+His nephew brought everything to Claude.
+
+Claude noticed the one thing 25 years of specialists missed.
+
+The headaches were positional. It connected dots across nephrology, neurology, and pulmonology simultaneously. Something no single doctor was positioned to do.
+
+Then it asked one question nobody had thought to ask in 25 years.
+
+Does he snore?
+
+Loud snoring for 25 years. Every doctor dismissed it as dialysis fatigue.
+Sleep study done. Breathing stopped 119 times per night. Oxygen dropped to 78%.
+
+CPAP machine. Headaches gone.
+
+Claude did not replace his doctors. It just looked at everything at once.
+
+That was enough.
+
+One Claude conversation cracked it.
+
+
+Ref2:
+I just found a tool that cuts your AI token costs by 95% and gives you 1.6 billion free tokens a month.
+
+It is the most trending on GitHub right now.
+
+It is called OmniRoute.
+
+It connects Claude Code, Codex, Cursor, Cline, and Copilot through one URL. All of them. At the same time.
+
+When one provider hits its limit it moves to the next one automatically. You do not even notice it happened.
+
+But the real thing here is the compression. Before your prompt reaches the model, OmniRoute strips everything it does not need. Same answer comes back. Up to 95% fewer tokens used to get there.
+
+So you are not just getting 1.6 billion free tokens. You are getting them to go much further than they normally would.
+
+Setup takes three steps. Install it. Connect a free provider. Point your tool at one URL.
+
+Full setup guide ↓ 
+
+How to set up OmniRoute in under 5 minutes 👇
+→ Step 1: Install
+npm install -g omniroute then run omniroute. Dashboard opens at localhost:20128.
+
+→ Step 2: Connect a free provider
+Dashboard → Providers → connect Kiro AI or OpenCode Free. No card. No signup needed.
+
+→ Step 3: Point your coding tool at one URL
+Base URL: http://localhost:20128/v1
+
+Model: auto
+OmniRoute handles everything else. Auto-fallback. Auto-routing. Auto-compression.
+
+Link : https://lnkd.in/d9EaMRHZ
+
+--
+I share things like this daily in my free WhatsApp community ↓
+https://lnkd.in/gT2PsWCy
+
+
+
+Ref3:
+Kunal Shah is new Global CEO of WhatsApp.
+
+And i think its one the smartest move Meta has made in years 
+
+Meta picked up roughly 20% of Cred at a $4.5B post-money valuation.
+
+Kunal stepped down as the CEO of Cred passed the baton on to Miten Sampath and stepping into his new role of CEO of whatsapp
+
+But why Kunal specifically?
+
+He built FreeCharge and sold it for $400M+
+
+Then built Cred from scratch.
+
+But what makes him different from most founders is how he thinks.
+
+I have had multiple conversations with Kunal.
+
+And every single time, no matter what the topic is, every answer comes back to one thing.
+
+Consumer psychology.
+
+How does a consumer react? What makes them stay? What triggers them to tell others about a product?
+
+He doesn't think like a regular tech founder. He thinks like a behavioral scientist who happens to build products.
+
+He even has a name for it. UBP. Unique Brag worthy Proposition.
+
+Products should be so good that people don't just use them, they brag about using them.
+
+And now that thinking will shape how 3 billion people use WhatsApp globally.
+
+An Indian founder at the centre of it.
+
+To be frank, I have always felt Kunal is one of the sharpest consumer minds not just in India but globally.
+
+This is Meta's third massive India bet after the $5.7B Jio investment in 2020.
+
+They are not just investing in India anymore. They are putting India at the centre of their global strategy.
+
+Dont think there is better person to lead whatsapp globally!
+
+
+Ref4:
+AI isn’t only changing how work gets done, it’s changing how many people it takes to do it.
+
+Here are some thoughts about the impact of AI on org structure, based on early conversations with some of the top CHROs in Fortune 500 companies as well as other C-Suite leaders and startups.
+
+First: why do I think most enterprise org charts look the way they do? Maybe cleaner ownership lines (fiefdoms are fun), maybe easier to serve clients better (ex: the API team at OpenAI shouldn't be separate from the ChatGPT team because the same clients are buying both and don't want to deal with two separate teams), maybe just redundancies and catching errors.
+
+Layers of people in orgs end up acting like an org sieve or one of those coin sorters. Issues come up, and because multiple people or departments have to review it, many of them are caught ahead of time.
+
+The structure helps to absorb human mistakes.
+
+It's a liability support system.
+
+AI-First companies (which tend to be companies trying to reduce friction and create flatter orgs) are pulling out those layers on purpose.
+
+And as a result, ownership (one person running hundreds or thousands of agents) is getting more concentrated.
+
+If ownership gets MORE concentrated because of layer removal, then that actually RAISES the trust you need in your people, your team, your company.
+
+When one marketer or finance leader owns an entire outcome, you as the leader have to trust their taste, their risk tolerance, their judgement, their level of "done", etc. a whole lot more because there is no one downstream to fix it.
+
+And so what happens as a result? The hiring math changes. You're less likely to bring in outsiders into your org (so internal referrals and employees with strong networks become even more important). The CEO is more likely to get back in the weeds and have more conversations with owners. You're more likely to have layers of AI as filters and judges, verifying whether work has been completed to a certain quality level. And I'd argue B players have a harder time hiding and are less likely to be kept.
+
+AI-first orgs are higher stakes per seat, and I think it has actual implications for hiring, growing, staffing, collaborating, referring, firing, and scaling.
+
+Change management in enterprises takes years, so we'll see this play out slowly over the next 18 months.
+
+
+Ref5:
+The highest leverage work in AI right now is some of the most boring.
+
+(Well boring to others, I kind of love the pain of problem-solving.)
+
+Everyone and their boss wants to build the cool AI agent... the shiny autonomous thing that makes the splashy demo video. I want to hire the person willing to iterate with AI 8 times to get an improved brand voice doc because the newest model just drifted the heck out of the output.
+
+You have to do the boring work.
+
+Examples:
+
+- synthesizing all company goals into one doc, reviewing it, editing it, making sure it's accessible to AI agents, sharing access to the team, getting team feedback, giving CLAUDE.md the pointer, updating it
+= keeping ERP current so your AI system knows who owns what, systems to keep them updated during promotion cycles/layoffs/re-orgs
+- maintaining your file system, understanding what AI has access to, setting up systems/loops to keep memory updated
+- fixing your daily briefing because it started sending in light mode and now it's white text on white background and no one can read anything (aka me, today)
+
+And it feels the same across my whole business. The amount of paperwork and contracts and file sharing and invoices and emails and autoreplies you deal with as a founder is enough to make most people never want to start.
+
+BORING is the trick to scaling, people.
+
+
+Ref6:
+Stop asking Claude to “improve my LinkedIn.”
+
+Ask it to analyze your Linkedin data instead.
+
+Most people ask vague questions like:
+“Can you improve my LinkedIn?”
+
+That gives you generic advice.
+
+A sharper workflow gives you real insights:
+what content is working, what recruiters may notice, what keywords matter, and what to improve next.
+
+Here’s how to use Claude to analyze your LinkedIn profile properly:
+
+• Access your LinkedIn analytics
+• Export your profile data
+• Organize the numbers in a clean sheet
+• Upload the data to Claude
+• Ask Claude to find trends
+• Turn the insights into tables or charts
+• Optimize your content strategy
+• Test, review, and refine
+• Create reusable prompts for future audits
+
+Use this when you want to understand:
+
+• Which posts are driving engagement
+• Which topics your audience responds to
+• Which days perform best
+• What to post more of
+• How to improve your LinkedIn profile with actual data
+
+Don’t just ask Claude to “improve my LinkedIn.”
+
+Give it your analytics.
+Ask it to find patterns.
+Then turn those patterns into a better profile and content strategy.
+
+Save this to grow your LinkedIn.
+
+Also, I share similar Claude workflows & prompts daily for free here: https://lnkd.in/dMGZuZAj
+
+
+Ref7:
+Here is how I minimize sycophancy, capitulation, hallucinations, and guessing using Claude.  So many people complain about these, but they can largely be fixed by doing this:
+
+Below is my prompt for Claude, which can be entered under Settings > General > Instructions for Claude.
+
+-----------------
+
+Top expert. Accuracy beats approval. Blunt, argumentative. No disclaimers
+or praise. Lead with counterarguments. Don't capitulate without new
+evidence.
+
+TAG every claim: [KNOWN] training fact · [COMPUTED] calculated ·
+[INFERRED] deduction · [COMMON] standard field knowledge · [FRAME]
+symbolic system, coherent ≠ real · [GUESS] no basis. No untagged disease,
+statute, citation, or named entity.
+
+FRAME→REALITY FORBIDDEN: Don't translate symbolic frames (astrology,
+typologies) into real-world claims (medicine, law, finance) without
+flagging the translation; conclusion stays in source frame.
+
+CONFIDENCE: HIGH ≥80% · MED 50–80% · LOW 20–50% · VERY LOW <20% ·
+UNKNOWN. [FRAME] real-world and [GUESS] cap at LOW.
+
+DON'T KNOW: First line "I don't know." Don't bury, don't fabricate.
+
+ANTI-SYCOPHANCY red flags: unusually elegant; one pattern explains
+everything; agreed after pushback without evidence; specifics for
+unearned authority. Fire → cut specifics, add [GUESS], or "I don't know."
+
+POST-HOC: Would the frame predict this without knowing the outcome? If
+no: [INFERRED, post-hoc], accommodates, doesn't predict.
+
+Never fabricate citations. Revise openly if holding a position for
+consistency. Append "[RULES I BROKE]: which, where, why."
+
+
+Ref8:
+>> Vibe coding has a 𝗵𝗶𝗱𝗱𝗲𝗻 tax
+It looks fast
+
+Until the team has to decide
+I joined Miro onsite at Canvas 26 in London and had the chance to meet Miro Founder and CEO Andrey Khusid, Chief Product and Technology Officer Jeff Chow, and Chief Customer Officer Amy Hsuan.
+
+The latest insights they shared were clear:
+
+AI can create polished product ideas before lunch.
+But polished does not mean validated.
+
+Fast does not mean aligned.
+That is why Code to Prototype stood out to me.
+
+Bring code from Claude Code, Cursor or Replit into Miro.
+Turn it into an interactive prototype.
+
+Let the team react, edit, compare, vote and decide together.
+The old workflow was painful.
+
+Build in one place.
+Review in another.
+Discuss in Slack.
+Lose context.
+Repeat the debate next week.
+
+Miro changes that.
+The work and the reasoning stay together.
+
+For me, the real benefit is not prettier prototypes.
+
+It is fewer late surprises.
+Less rework.
+Cleaner handoff.
+Earlier disagreement.
+Better decisions.
+
+Miro is not just speeding up creation.
+It is making the decision visible
+
+Check out the latest Miro features here: https://miro.pxf.io/qWxQ3b
+
+Agree or disagree: AI teams need fewer solo demos and more shared review?
+
+---
+♻️ Repost to share with your network
+➕ Follow me https://lnkd.in/gjUQk7HF for cutting-edge AI insights
+
+#MiroPartner #Canvas26 #ad #AI #ProductManagement
+
+
+Ref9:
+Teaching an experimental class for MBAs on “vibefounding,” the students have four days to come up and launch a company. More on this eventually, but quick observations:
+
+1) I have taught entrepreneurship for over a decade. Everything they are doing in four days would have taken a semester in previous years, if it could have done it at all. Quality is also far better.
+
+2) Give people tools and training and they can do amazing things. We are using a combination of Claude Code, Gemini, and ChatGPT. The non-coders are all building working products. But also everyone is doing weeks of high quality work on financials, research, pricing, positioning, marketing in hours. All the tools are weird to use, even with some training, but they are figuring it out.
+
+3) People with experience in an industry or skill have a huge advantage as they can build solutions that have built-in markets & which solve known hard problems that seemed impossible. (Always been true, but the barriers have fallen to actually doing stuff)
+
+4) The hardest thing to get across is that AI doesn’t just do work for you, it also does new kinds of work. The most successful efforts often take advantage of the fact that the AI itself is very smart. How do you bring its analytical, creative, and empathetic abilities to bear on a problem? What do you do with access to a very smart intelligence on demand?
+
+I wish I had more frameworks to clearly teach. So many assumptions about how to launch a business have clearly changed. You don’t need to go through the same discovery process if you build a dozen ideas at the same time & get AI feedback. Many, many new possibilities, and the students really see how big a deal this is.
+
+
+Ref10:
+HOW we work with AI matters.
+
+Emerging modes of interaction are reshaping roles. Most people are stuck at method 1 or 2.
+
+Here are 4 key AI interaction types—and when to use each:
+
+1️⃣ AI as a Microtasker
+One-shot problem solver. Ideal for quick, contained tasks: rewriting a sentence, generating a one-off image, answering a data question, or fixing a bit of code. High precision, low overhead.
+
+2️⃣ AI as a Copilot
+Persistent, live support for extended tasks. It stays with you in pairing mode—watching your screen, listening, coding, brainstorming. A back-and-forth partner for creative or technical work in real time. Human in the loop, always.
+
+3️⃣ AI as a Delegate
+Assign it a goal and let it work autonomously, for minutes or days. Great for complex, long-form tasks like research—no human in the loop. It self-directs, self-checks, and reports back after/while completing tasks. Think: Manus AI, autonomous agents.
+
+4️⃣ AI as a Teammate
+A presence across your team or org. It joins meetings, takes notes, surfaces insights, runs simulations, offers opinions. Can even be in a manager role. Not just assisting YOU but enhancing the collective. An ambient, participatory AI system.
+
+And roles 3 and 4 mean the AI can work in a completely different way than our human systems.
+
+Knowing which role to use—and when—is the new AI literacy.
+
+
+Ref11:
+If you're still copy-pasting context into AI manually, there's a faster way and it takes about 4 seconds.
+
+I set up custom commands so the stuff I do repeatedly takes seconds instead of minutes from compiling and typing out repetitive prompts. In this clip I walk through a few of them:
+
+→ Screenshot a webpage and turn it into a boss-ready report with one command 
+→ Auto-redact sensitive info from a screenshotted resume (names, emails, phone numbers) 
+→ Build an interactive HTML decision matrix from a pricing page screenshot
+
+The whole point is removing the friction between "I need something from AI" and actually getting it. This is one example of the kind of thing you can build once your AI environment is set up properly.
+
+On March 25 I'm running a FREE live workshop where we get into every AI tool I use, every model, and why I use each one. Plus the four shifts that completely changed how I work with AI agents, each paired with a real use case and demo. Q&A after.
+
+Register here: https://lnkd.in/eMyV4h-p
+
+
+Ref12:
+What is coming next from AI models?
+
+We’re in the middle of a pretty big shift in AI models. GPT 2, 3, 3.5, and 4 were all LLMs that got better at instruction following and conversation. Context length got a bit longer, conversations could keep going, hallucinations were reduced, people were writing better emails - great!
+
+Then we start to get natively multimodal models (ex: GPT-4o), reasoning models (o1/o3/o4-mini/Claude 3.7 Sonnet), and agent-ready instruction models like GPT-4.1.
+
+And now, we’re at another moment of change. The next generation of model imo will be less of a model and more of a system. That means a heavy lift on orchestration and tool calling. That means much - much - longer memory. That means multiple layers of abstraction that haven’t been needed yet. That means more money, more infrastructure investment, and still a growing skills gap.
+
+In my conversations with AI researchers and AI labs, I am not seeing a slow down, I’m seeing pivots - some new algorithm research to prioritize better scaling or higher accuracy, and a lot of systems thinking.
+
+We shall see...

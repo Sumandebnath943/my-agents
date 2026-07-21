@@ -1,0 +1,26 @@
+# .github/workflows/10-linkedin-seed-voice.yml
+# One-off (manual) job: seed the LinkedIn reference exemplars (agents/10-linkedin/reference-posts.txt)
+# into the voice memory. The exemplars are ALSO injected from code on every draft, so this is the
+# "+ memory" backup half — run it once after adding/refreshing reference posts. Manual only.
+name: LinkedIn · Seed Voice Memory
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: 10-linkedin-seed-voice
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: npm run linkedin:seed-voice
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
