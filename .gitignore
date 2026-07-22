@@ -5,10 +5,12 @@ node_modules/
 # Private financial screenshots (finance-agent training data) — never publish
 Payment Messages Training/
 
-# Local project docs — keep out of the public repo
-HANDOFF.md
-PROJECT_BIBLE.md
-PORTFOLIO_HANDOFF.md
-PORTFOLIO_UPDATE_HANDOFF.md
-MAS_SETUP.md
-ECHO_SETUP.md
+# Local project docs — keep out of the public repo.
+# Wildcards, not exact names: an archived/backup copy (e.g. PORTFOLIO_UPDATE_HANDOFF.previous-*.md)
+# would otherwise slip past an exact-match rule and get committed to a PUBLIC repo.
+HANDOFF*.md
+PROJECT_BIBLE*.md
+PORTFOLIO_HANDOFF*.md
+PORTFOLIO_UPDATE_HANDOFF*.md
+MAS_SETUP*.md
+ECHO_SETUP*.md
