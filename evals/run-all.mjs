@@ -17,8 +17,9 @@ import { run as integrity } from "./integrity/run.mjs";
 import { run as winners } from "./winners/run.mjs";
 import { run as reconcile } from "./reconcile/run.mjs";
 import { run as calendar } from "./calendar/run.mjs";
+import { run as health } from "./health/run.mjs";
 
-const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, integrity, winners, reconcile, calendar];
+const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, integrity, winners, reconcile, calendar, health];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];

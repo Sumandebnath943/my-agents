@@ -6,6 +6,7 @@ import { env } from "../../lib/env.js";
 import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 import { generateNotes } from "../14-notes/generate.js";
 import { addIdea, listIdeas } from "../18-ideas/ideas.js";
+import { summary, series, streak, findings } from "../17-habits/analyze.js";
 
 // Lazy DB so importing this module (e.g. to read command metadata) needs no Supabase env.
 let _db;
@@ -101,11 +102,54 @@ async function drafts() {
   }
 }
 
+// The analysis view of the habit data — sleep duration, streak, averages, and the sleep/exercise
+// comparisons once there's enough history for them to be honest.
+async function health(args) {
+  const days = windowDays(args, 30);
+  const { data } = await db().from("habits").select("*").gte("log_date", sinceDate(days)).order("log_date", { ascending: false });
+  if (!data?.length) return notifyTelegram(`❤️ <b>Health</b>\nNo logs in the last ${days} day(s). Log one like: <code>slept 23:30 woke 7 productivity 4 mood 4</code>`, { html: true });
+  const s = summary(data), run = streak(data), f = findings(data);
+  const line = [
+    s.avg_sleep != null ? `😴 ${s.avg_sleep}h avg sleep` : null,
+    s.avg_productivity != null ? `⚡ ${s.avg_productivity}/5 productivity` : null,
+    s.avg_mood != null ? `🙂 ${s.avg_mood}/5 mood` : null,
+    `🏋️ ${s.exercise_days}/${s.days} days`,
+  ].filter(Boolean).join("\n");
+  const insight = f.ready
+    ? (f.items.length ? `\n\n<b>Patterns</b>\n${f.items.map((i) => `• ${tgEscape(i.text)}`).join("\n")}` : "\n\n<i>No clear patterns yet — your days look fairly consistent.</i>")
+    : `\n\n<i>${tgEscape(f.reason)}</i>`;
+  return notifyTelegram(`❤️ <b>Health — last ${days} day(s)</b>\n${run > 1 ? `🔥 ${run}-day streak\n` : ""}\n${line}${insight}`, { html: true });
+}
+
+async function sleep(args) {
+  const days = windowDays(args, 14);
+  const { data } = await db().from("habits").select("*").gte("log_date", sinceDate(days)).order("log_date", { ascending: false });
+  const rows = series(data || []).filter((r) => r.sleep != null).reverse();
+  if (!rows.length) return notifyTelegram(`😴 <b>Sleep</b>\nNothing logged in the last ${days} day(s).`, { html: true });
+  const s = summary(data);
+  const body = rows.slice(0, 14).map((r) => `${tgEscape(r.date)} · <b>${r.sleep}h</b>${r.productivity != null ? ` · ⚡${r.productivity}` : ""}`).join("\n");
+  return notifyTelegram(`😴 <b>Sleep — last ${days} day(s)</b>\nAverage <b>${s.avg_sleep ?? "?"}h</b> over ${rows.length} night(s)\n\n${body}`, { html: true });
+}
+
+async function mood(args) {
+  const days = windowDays(args, 30);
+  const { data } = await db().from("habits").select("*").gte("log_date", sinceDate(days)).order("log_date", { ascending: false });
+  const rows = series(data || []).filter((r) => r.mood != null).reverse();
+  if (!rows.length) return notifyTelegram(`🙂 <b>Mood</b>\nNothing logged yet. Add it like: <code>mood 4</code>`, { html: true });
+  const s = summary(data);
+  const bar = (n) => "▮".repeat(Math.max(0, Math.round(n))) + "▯".repeat(Math.max(0, 5 - Math.round(n)));
+  const body = rows.slice(0, 14).map((r) => `${tgEscape(r.date)} ${bar(r.mood)} ${r.mood}/5`).join("\n");
+  return notifyTelegram(`🙂 <b>Mood — last ${days} day(s)</b>\nAverage <b>${s.avg_mood ?? "?"}/5</b>\n\n${body}`, { html: true });
+}
+
 export const COMMANDS = {
   journal:  { description: "Recent journal entries (e.g. /journal last week)", handler: journal },
   reading:  { description: "Your unread saved links", handler: reading },
   expenses: { description: "Spend summary (e.g. /expenses month)", handler: expenses },
   habits:   { description: "Recent habit logs (e.g. /habits 14)", handler: habits },
+  health:   { description: "Sleep/mood/productivity analysis (e.g. /health 30)", handler: health },
+  sleep:    { description: "Your sleep durations (e.g. /sleep 14)", handler: sleep },
+  mood:     { description: "Your mood trend (e.g. /mood 30)", handler: mood },
   notes:    { description: "Notes from a video/article: /notes <url>", handler: notes },
   idea:     { description: "Save + spec a new idea: /idea <one-liner>", handler: idea },
   ideas:    { description: "Your ranked idea backlog", handler: ideas },
