@@ -72,6 +72,18 @@ export function run() {
     { id: "website", q: "Portfolio or website", want: "website" },
     { id: "current company", q: "Current Company", want: "current_company" },
     { id: "current title", q: "Current designation", want: "current_title" },
+    // REGRESSION (seen on a real filled form): "Have you worked with GTM Closely?" was answered
+    // "No" from the company-history key. GTM here is Google Tag Manager — a tool the owner uses
+    // daily. A past-EMPLOYMENT marker is now mandatory.
+    { id: "'worked WITH a tool' is NOT company history", q: "Have you worked with GTM Closely? If yes Who are your primary stakeholders", want: null },
+    { id: "'worked with Figma the tool' is not company history", q: "Have you worked with Figma?", want: null },
+    { id: "'previously worked at' IS company history", q: "Have you previously worked at Figma?", want: "worked_here_before" },
+    { id: "'ever worked for' IS company history", q: "Have you ever worked for Groww?", want: "worked_here_before" },
+    { id: "'employed by ... before' IS company history", q: "Have you been employed by Pendo before?", want: "worked_here_before" },
+    // REGRESSION: a long question merely CONTAINING "portfolio" was answered with the portfolio URL.
+    { id: "long question containing 'portfolio' is not the website field", q: "Do you have experience in Advertising's portfolio in an ad tech background across represented regions?", want: null },
+    { id: "short 'Portfolio URL' still maps", q: "Portfolio URL", want: "website" },
+    { id: "long question containing 'phone' is not the phone field", q: "Describe a time you had to handle a difficult customer phone call and what you learned", want: null },
     { id: "how did you hear", q: "How did you hear about this role?", want: "how_did_you_hear" },
     { id: "first name", q: "First Name", want: "first_name" },
     { id: "last name", q: "Last Name", want: "last_name" },
@@ -233,6 +245,13 @@ export function run() {
     { id: "NEVER invents a work-authorization answer", env: {}, check: (r) => !r.answers.authorized_to_work && !r.answers.needs_sponsorship },
     { id: "missing keys are reported", env: {}, check: (r) => r.missing.includes("expected_ctc") },
     { id: "blank values count as missing", env: { APPLY_ANSWERS: '{"phone":"   "}' }, check: (r) => r.missing.includes("phone") },
+    // A form leaving First Name blank because only full_name was configured is a visible failure.
+    { id: "first/last derive FROM full_name", env: { APPLY_ANSWERS: '{"full_name":"Suman Debnath"}' },
+      check: (r) => r.answers.first_name === "Suman" && r.answers.last_name === "Debnath" },
+    { id: "explicit first_name is never overwritten", env: { APPLY_ANSWERS: '{"full_name":"A B","first_name":"Zed"}' },
+      check: (r) => r.answers.first_name === "Zed" },
+    { id: "single-word full_name still yields both", env: { APPLY_ANSWERS: '{"full_name":"Cher"}' },
+      check: (r) => r.answers.first_name === "Cher" && r.answers.last_name === "Cher" },
   ];
   const loadRes = runCases("job-apply · answer loading (nothing sensitive is defaulted)", loadCases, (c) => {
     const got = loadAnswers(c.env);

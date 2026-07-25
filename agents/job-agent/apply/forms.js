@@ -69,7 +69,11 @@ const PATTERNS = [
   ["needs_sponsorship",   /\b(require|requires|required|need|needs|needed|request|requesting|seek|seeking|commence|obtain)\b[^?]{0,80}\b(sponsorship|sponsor|visa|work\s*authoriz\w*|work\s*permit|immigration)\b/i],
   ["authorized_to_work",  /\b(authoriz\w*\s*to\s*work|authorised\s*to\s*work|legally\s*authoriz|eligible\s*to\s*work|permitted\s*to\s*work|right\s*to\s*work|work\s*permit|work\s*authoriz|legal\s*authoriz\w*\s*to\s*work)/i],
   // Company-history questions. Almost always "No", and they appear on 2.1% of required fields.
-  ["worked_here_before",  /\b(previously|ever|before)\b[^?]{0,60}\b(work(ed)?|employ(ed|ment)|consult(ed)?|intern(ed)?)\b[^?]{0,40}\b(at|for|with|by|here)\b|\bhave you (ever )?(been employed|worked)\b/i],
+  // A PAST-EMPLOYMENT marker is mandatory. Without it, "Have you worked with GTM closely?" — a
+  // question about a tool the owner uses daily — was answered "No" from the company-history key.
+  // The temporal word ("previously", "ever", "before") is what distinguishes "have you worked HERE"
+  // from "have you worked WITH this thing".
+  ["worked_here_before",  /\b(previously|prior to|ever|before|in the past|formerly)\b[^?]{0,60}\b(work(ed)?|employ(ed|ment)|consult(ed)?|intern(ed)?)\b|\b(work(ed)?|employ(ed|ment)|consult(ed)?|intern(ed)?)\b[^?]{0,40}\b(previously|before|in the past)\b|\b(former|current)\s+employee\s+of\b/i],
   ["relative_at_company", /\b(relative|family member|friend|spouse|partner)\b[^?]{0,50}\b(work|employ)/i],
   // Work-preference questions the survey turned up as commonly required.
   ["willing_hybrid",      /\bhybrid\b|\b\d\s*days?\s*(per|a)\s*week\s*(in|from)\s*(the\s*)?office\b|\bwork\s*from\s*(the\s*)?office\b/i],
@@ -251,13 +255,29 @@ export function normalizeLabel(label) {
     .slice(0, 120);
 }
 
+// Keys that name a FIELD ("Portfolio URL", "Phone") rather than answer a QUESTION. A long sentence
+// that merely contains the word is a question, not that field — "Do you have experience in
+// Advertising's portfolio in an ad tech background across represented regions?" was being answered
+// with the owner's portfolio URL. Anything past this length is prose and must be read as a question.
+const SHORT_LABEL_KEYS = new Set([
+  "first_name", "last_name", "full_name", "preferred_name", "legal_name", "email", "phone",
+  "location", "city", "country", "zip_code", "linkedin", "website", "github", "twitter",
+  "current_company", "current_title", "school", "degree", "discipline",
+  "edu_start_year", "edu_end_year", "years_experience",
+]);
+const MAX_SHORT_LABEL = 60;
+
 /** The canonical answer key for a question label, or null when nothing matches confidently. */
 export function classifyQuestion(label) {
   const s = String(label || "").replace(/\s+/g, " ").trim();
   if (!s) return null;
   if (isDemographic(s)) return null;
   if (asksForeignAuthorization(s)) return null;   // country-specific: a human answers this one
-  for (const [key, re] of PATTERNS) if (re.test(s)) return key;
+  for (const [key, re] of PATTERNS) {
+    if (!re.test(s)) continue;
+    if (SHORT_LABEL_KEYS.has(key) && s.length > MAX_SHORT_LABEL) return null;
+    return key;
+  }
   return null;
 }
 

@@ -229,17 +229,40 @@ CV:\n${CV.slice(0, 2500)}`,
 
   // --- Fill ------------------------------------------------------------------------------------
   const filled = [];
+  // Dropdowns where we couldn't find an exact option and fell back to "whatever was highlighted".
+  // Surfaced in the review panel, because that is precisely where a wrong country code comes from.
+  const inexact = [];
   for (const f of plan.fills) {
     if (!f.selector) continue;
     try {
       const el = page.locator(f.selector).first();
       if (f.kind === "select") await el.selectOption({ label: f.value }).catch(async () => { await el.selectOption(f.value); });
       else if (f.kind === "combobox") {
-        // React-select style: type, wait for the menu, take the first option.
+        // React-select style. Taking the FIRST option after typing is wrong and was actively
+        // harmful: typing "India" into a phone-country selector matched "British Indian Ocean
+        // Territory" (+246) before India, and that is what got submitted. Always prefer an option
+        // whose text matches EXACTLY; only fall back to the first match when there is no exact one.
         await el.click();
         await el.fill(f.value).catch(() => {});
-        await page.waitForTimeout(600);
-        await page.keyboard.press("Enter").catch(() => {});
+        await page.waitForTimeout(700);
+        const want = String(f.value).trim().toLowerCase();
+        const options = page.locator('[role="option"], .select__option, [class*="option"]:visible');
+        let picked = false;
+        const n = Math.min(await options.count().catch(() => 0), 30);
+        for (let i = 0; i < n; i++) {
+          const text = (await options.nth(i).innerText().catch(() => "")).trim().toLowerCase();
+          // "India" must beat "British Indian Ocean Territory"; a country list also renders
+          // "India +91", so an exact match OR an exact first-token match both count.
+          if (text === want || text.split(/[\s(+,]/)[0] === want) {
+            await options.nth(i).click({ timeout: 3000 }).catch(() => {});
+            picked = true;
+            break;
+          }
+        }
+        if (!picked) {
+          await page.keyboard.press("Enter").catch(() => {});
+          inexact.push(f.label);
+        }
       } else if (f.kind === "checkbox" || f.kind === "radio") {
         if (/^(yes|true)$/i.test(f.value)) await el.check().catch(() => {});
       } else {
@@ -263,7 +286,13 @@ CV:\n${CV.slice(0, 2500)}`,
       mimeType: "application/pdf",
       buffer: buf,
     });
-    resumeAttached = true;
+    // setInputFiles resolving is not proof the widget accepted it — verify the input really holds
+    // a file before claiming the resume is attached, since submit depends on this being honest.
+    await page.waitForTimeout(1200);
+    const count = await page.locator(ATS[ats].resumeInput).first()
+      .evaluate((el) => (el.files ? el.files.length : 0)).catch(() => 0);
+    resumeAttached = count > 0;
+    if (!resumeAttached) console.error("  resume upload did not register on the form.");
   } catch (e) {
     console.error(`  resume not attached: ${e.message} (upload it with scripts/upload-resume.mjs)`);
   }
@@ -287,6 +316,8 @@ CV:\n${CV.slice(0, 2500)}`,
 
   const formRecord = {
     ats, apply_url: applyUrl, resume_attached: resumeAttached,
+    inexact,                                   // dropdowns that may hold the wrong option
+    coverage: plan.coverage,
     filled, summary: summarizePlan(plan),
     unanswered: plan.unanswered.map((f) => ({ label: f.label, required: !!f.required })),
     skipped: plan.skipped.map((f) => f.label),

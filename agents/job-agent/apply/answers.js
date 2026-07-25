@@ -56,11 +56,28 @@ export function loadAnswers(env = process.env) {
     }
   }
 
+  // A BLANK value in the secret must behave as "not set", not as "set to empty". `??` only falls
+  // through on null/undefined, so `"first_name": ""` used to suppress the fallback entirely and the
+  // form went out with an empty First Name.
+  const given = {};
+  for (const [k, v] of Object.entries(fromSecret)) {
+    const s = typeof v === "string" ? v.trim() : String(v ?? "").trim();
+    if (s) given[k] = s;
+  }
+
+  // If YOU supplied a full name, the two halves come from THAT — not from the hardcoded profile,
+  // which would otherwise silently contradict what you configured.
+  if (given.full_name) {
+    const [first = "", ...rest] = given.full_name.split(/\s+/);
+    given.first_name ||= first;
+    given.last_name ||= rest.join(" ") || first;
+  }
+
   // Non-sensitive defaults only. Never default a salary, a phone number or a notice period.
-  const [first = "", ...rest] = String(PROFILE.name || "").split(/\s+/);
+  const [pFirst = "", ...pRest] = String(PROFILE.name || "").split(/\s+/);
   const defaults = {
-    first_name: first,
-    last_name: rest.join(" "),
+    first_name: pFirst,
+    last_name: pRest.join(" "),
     full_name: PROFILE.name || "",
     location: PROFILE.location || "",
     country: "India",
@@ -68,13 +85,18 @@ export function loadAnswers(env = process.env) {
 
   const answers = {};
   for (const k of ANSWER_KEYS) {
-    const v = fromSecret[k] ?? defaults[k] ?? "";
-    const s = typeof v === "string" ? v.trim() : String(v ?? "").trim();
-    if (s) answers[k] = s;
+    const s = given[k] ?? defaults[k] ?? "";
+    if (s) answers[k] = String(s).trim();
   }
-  // full_name is convenient for single-field forms (Lever uses one "name" input).
+  // Names derive BOTH ways. Lever asks for one "name" field, Greenhouse for two, and a form
+  // leaving First Name blank because only `full_name` was configured is a silent, visible failure.
   if (!answers.full_name && (answers.first_name || answers.last_name)) {
     answers.full_name = [answers.first_name, answers.last_name].filter(Boolean).join(" ");
+  }
+  if (answers.full_name && (!answers.first_name || !answers.last_name)) {
+    const [first = "", ...rest] = answers.full_name.split(/\s+/);
+    answers.first_name ||= first;
+    answers.last_name ||= rest.join(" ") || first;
   }
   return { answers, missing: ANSWER_KEYS.filter((k) => !answers[k]) };
 }
