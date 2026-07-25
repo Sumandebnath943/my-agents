@@ -18,8 +18,12 @@ import { run as winners } from "./winners/run.mjs";
 import { run as reconcile } from "./reconcile/run.mjs";
 import { run as calendar } from "./calendar/run.mjs";
 import { run as health } from "./health/run.mjs";
+import { run as jobFilter } from "./job-filter/run.mjs";
+import { run as jobApply } from "./job-apply/run.mjs";
+import { run as jobFeedback } from "./job-feedback/run.mjs";
+import { run as jobDedupe } from "./job-dedupe/run.mjs";
 
-const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, integrity, winners, reconcile, calendar, health];
+const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, integrity, winners, reconcile, calendar, health, jobFilter, jobApply, jobFeedback, jobDedupe];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];

@@ -1,0 +1,35 @@
+# .github/workflows/job-weekly.yml
+# Monday review of the job search — what happened, and what your dismissals taught the filter.
+#
+# Separate from job-agent.yml on purpose: the daily run exits early when there are no new roles,
+# which would skip the review entirely on a quiet week. This is also the weekly digest the daily
+# email deliberately doesn't try to be.
+#
+# Read-only over the jobs table. It PROPOSES config changes; it never edits anything.
+name: Job Search Weekly Review
+on:
+  schedule:
+    - cron: "0 3 * * 1"     # Mondays, 08:30 IST
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: job-weekly-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node agents/job-agent/weekly.js
+        env:
+          AGENT_NAME: job-weekly
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          MY_EMAIL: ${{ secrets.MY_EMAIL }}

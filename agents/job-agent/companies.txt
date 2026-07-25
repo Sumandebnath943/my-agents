@@ -74,3 +74,100 @@ CRED
 Meesho
 PhonePe
 Freshworks
+Razorpay
+Zerodha
+Swiggy
+Zomato
+Flipkart
+Myntra
+Nykaa
+Paytm
+Zoho
+Chargebee
+BrowserStack
+Whatfix
+Hasura
+Postman
+InMobi
+Dream11
+Urban Company
+Lenskart
+PolicyBazaar
+Cars24
+Rapido
+ShareChat
+Unacademy
+Physics Wallah
+upGrad
+Simplilearn
+Darwinbox
+Icertis
+Innovaccer
+LeadSquared
+Netcore Cloud
+MoEngage
+CleverTap
+WebEngage
+Zepto
+Licious
+Purplle
+Pristyn Care
+Practo
+Porter
+Delhivery
+Zetwerk
+Turtlemint
+Navi
+Slice
+Jupiter
+Fi Money
+Setu
+M2P Fintech
+Perfios
+Signzy
+Yubi
+KreditBee
+Juspay
+Cashfree
+PhonePe
+Pine Labs
+BharatPe
+Open Financial Technologies
+Uni Cards
+Refyne
+Jar
+Fold
+Sarvam AI
+Krutrim
+Observe AI
+Gupshup
+Haptik
+Yellow AI
+Uniphore
+SirionLabs
+Eightfold AI
+Rippling
+Fractal Analytics
+Tracxn
+Chargebee
+Locus
+Shiprocket
+Vahan
+Springworks
+Plum
+Onsurity
+Nova Benefits
+Wingify
+VWO
+Scaler
+Newton School
+Emeritus
+Eruditus
+Toddle
+Classplus
+Teachmint
+Skit AI
+Mad Street Den
+Wysa
+HealthifyMe
+Cult Fit

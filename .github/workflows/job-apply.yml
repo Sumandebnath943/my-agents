@@ -1,0 +1,46 @@
+# .github/workflows/job-apply.yml
+# Assisted apply — fills an ATS application in a headless browser.
+#
+# NEVER RUNS ON A SCHEDULE, BY DESIGN. It is dispatched one role at a time, and `mode: submit` is
+# only ever triggered by the Submit button on the dashboard, after a human has looked at the
+# screenshot of the filled form. The driver additionally refuses to submit anything that is not
+# already in apply_state='prepared'. See agents/job-agent/apply/run.js.
+#
+# Playwright is installed here rather than in package.json so the other workflows' `npm ci` stays
+# lean (same pattern as 30-browser.yml).
+name: Assisted Apply
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "jobs.id of the role to apply to"
+        required: true
+        type: string
+      mode:
+        description: "prepare = fill + screenshot only · submit = send it (requires a prepared application)"
+        required: true
+        default: prepare
+        type: choice
+        options: [prepare, submit]
+permissions:
+  contents: read
+concurrency:
+  group: job-apply-${{ inputs.job_id }}
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: npm i playwright --no-save && npx playwright install --with-deps chromium
+      - run: node agents/job-agent/apply/run.js --id "${{ inputs.job_id }}" --mode "${{ inputs.mode }}"
+        env:
+          AGENT_NAME: job-apply
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          APPLY_ANSWERS: ${{ secrets.APPLY_ANSWERS }}
+          RESUME_STORAGE_PATH: ${{ secrets.RESUME_STORAGE_PATH }}

@@ -5,6 +5,15 @@ node_modules/
 # Private financial screenshots (finance-agent training data) — never publish
 Payment Messages Training/
 
+# CV / resume. agents/job-agent/index.js documents cv.md as a local fallback for the CV_TEXT
+# secret, which makes it easy to drop a real CV here by accident — into a PUBLIC repo. The resume
+# PDF lives in the private Supabase bucket (scripts/upload-resume.mjs); nothing goes here.
+agents/job-agent/cv.md
+*resume*.pdf
+*resume*.docx
+*Resume*.pdf
+*Resume*.docx
+
 # Local project docs — keep out of the public repo.
 # Wildcards, not exact names: an archived/backup copy (e.g. PORTFOLIO_UPDATE_HANDOFF.previous-*.md)
 # would otherwise slip past an exact-match rule and get committed to a PUBLIC repo.
