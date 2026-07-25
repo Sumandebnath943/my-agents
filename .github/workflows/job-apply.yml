@@ -30,7 +30,9 @@ concurrency:
 jobs:
   apply:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # npm ci + a Chromium download + a heavy form can genuinely take a while; 15 was tight enough
+    # that a slow run could be killed mid-fill and look like a hang.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,3 +52,25 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           RESUME_STORAGE_PATH: ${{ secrets.RESUME_STORAGE_PATH }}
+
+      # THE DEAD-MAN SWITCH.
+      # run.js writes 'preparing' before launching the browser and a final state at the end — but a
+      # process that is KILLED (job timeout, runner OOM, cancelled run, a crash before the handler)
+      # never reaches that final write, so the role sat on "Filling the form…" forever with the
+      # retry blocked. The WORKFLOW knows the job failed even when the process couldn't say so.
+      # Inputs go through env, never interpolated into the shell — see the CI injection hardening.
+      - name: Report failure back to the dashboard
+        if: failure()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          JOB_ID: ${{ inputs.job_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -sS -X PATCH "${SUPABASE_URL}/rest/v1/jobs?id=eq.${JOB_ID}" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            --data "$(printf '{"apply_state":"failed","apply_error":"The apply run failed before it could report back. Log: %s"}' "${RUN_URL}")" \
+            || echo "could not report failure back (the dashboard's 20-minute staleness rule still unblocks it)"
