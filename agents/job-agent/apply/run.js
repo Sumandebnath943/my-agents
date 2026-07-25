@@ -38,6 +38,14 @@ if (!jobId) { console.error("No --id given."); process.exit(1); }
 if (!["prepare", "submit"].includes(mode)) { console.error(`Unknown --mode ${mode}`); process.exit(1); }
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
+
+// A Supabase query builder is a THENABLE, not a Promise — it has .then() but NO .catch(). Calling
+// .catch() on one throws "is not a function", and having that inside the error handler is how a
+// recoverable failure became an unrecoverable one: the write meant to record apply_state='failed'
+// threw before it could, so the role sat on "Filling the form…" forever with the retry blocked.
+// Every best-effort DB write goes through here instead. Guarded by an eval in evals/job-apply.
+const quiet = async (builder) => { try { return await builder; } catch { return null; } };
+
 const setState = (patch) => db.from("jobs").update(patch).eq("id", jobId);
 
 const { data: job, error: jobErr } = await db.from("jobs").select("*").eq("id", jobId).maybeSingle();
@@ -224,7 +232,7 @@ CV:\n${CV.slice(0, 2500)}`,
   // keep. Best-effort: a failure here must never affect the application.
   for (const f of plan.fills.filter((x) => x.key === "learned")) {
     const norm = normalizeLabel(f.label);
-    await db.from("apply_answers").update({ times_used: (learnedUses[norm] || 0) + 1 }).eq("label_norm", norm).catch(() => {});
+    await quiet(db.from("apply_answers").update({ times_used: (learnedUses[norm] || 0) + 1 }).eq("label_norm", norm));
   }
 
   // --- Fill ------------------------------------------------------------------------------------
@@ -366,7 +374,7 @@ CV:\n${CV.slice(0, 2500)}`,
   }
 } catch (e) {
   console.error(`apply ${mode} failed: ${e.message}`);
-  await setState({ apply_state: "failed", apply_error: e.message.slice(0, 400) }).catch(() => {});
+  await quiet(setState({ apply_state: "failed", apply_error: e.message.slice(0, 400) }));
   process.exitCode = 1;
 } finally {
   await browser.close().catch(() => {});

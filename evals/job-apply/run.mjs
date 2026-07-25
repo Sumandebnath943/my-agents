@@ -9,6 +9,7 @@
 //      question BLOCKS submission rather than being guessed at or left silently blank.
 //
 // Pure + offline — no browser, no DB, no LLM.
+import { readFileSync } from "node:fs";
 import "../_env.mjs";
 import { runCases, isMain } from "../_lib.mjs";
 import { detectAts, classifyQuestion, isDemographic, answerFor, planForm, ATS, normalizeLabel, authAnswerableFor,
@@ -352,7 +353,28 @@ export function run() {
     } },
   ], (c) => ({ ok: !!c.check() }));
 
-  return [atsRes, qRes, demoRes, aRes, authRes, learnRes, normRes, planRes, loadRes, cfgRes, labelRes, consentRes, essayRes, planRealRes, bgCase];
+  // --- source hygiene ------------------------------------------------------------------------------
+  // A Supabase query builder is a THENABLE, not a Promise: it has .then() but NO .catch().
+  // `db.from(x).update(y).eq(z).catch(...)` throws "catch is not a function" — and when that
+  // pattern sat inside the error handler, a recoverable failure became an unrecoverable one:
+  // the write that should have recorded apply_state='failed' threw before it could, leaving the
+  // role stuck on "Filling the form…" with no way to retry. It cost two debugging rounds.
+  // Cheap to check, so check it.
+  const SRC = ["agents/job-agent/apply/run.js", "agents/job-agent/index.js", "agents/job-agent/weekly.js",
+               "agents/job-agent/portals.js", "agents/job-agent/adjudicate.js"];
+  const BUILDER_CATCH = /\.(?:eq|neq|in|is|not|match|select|insert|update|upsert|delete|limit|order|single|maybeSingle)\s*\([^;]*?\)\s*\.catch\s*\(/;
+  const hygieneCases = SRC.map((f) => ({ id: `no .catch() on a query builder — ${f.split("/").pop()}`, file: f }));
+  const hygieneRes = runCases("job-apply · source hygiene (Supabase builders are not Promises)", hygieneCases, (c) => {
+    let src = "";
+    try { src = readFileSync(new URL(`../../${c.file}`, import.meta.url), "utf8"); }
+    catch { return { ok: true, note: "file absent (warn)" }; }
+    const offenders = src.split(String.fromCharCode(10))
+      .map((line, i) => ({ line: line.trim(), n: i + 1 }))
+      .filter((l) => BUILDER_CATCH.test(l.line) && !l.line.startsWith("//"));
+    return { ok: offenders.length === 0, note: offenders.length ? `line ${offenders[0].n}: ${offenders[0].line.slice(0, 80)}` : "" };
+  });
+
+  return [atsRes, qRes, demoRes, aRes, authRes, learnRes, normRes, planRes, loadRes, cfgRes, labelRes, consentRes, essayRes, planRealRes, bgCase, hygieneRes];
 }
 
 if (isMain(import.meta.url)) {
