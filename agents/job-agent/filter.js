@@ -8,7 +8,8 @@
 // Everything here is pure and offline so evals/job-filter/run.mjs can hold it honest. Each gate
 // returns a REASON when it rejects — those reasons surface on the dashboard, so you can see what
 // is being thrown away instead of guessing.
-import { LEVELS, DOMAINS, TITLE_EXCLUDE, COMPANY_EXCLUDE, MIN_CTC_LPA, MAX_AGE_DAYS } from "./config.js";
+import { LEVELS, DOMAINS, TITLE_EXCLUDE, COMPANY_EXCLUDE, MIN_CTC_LPA, MAX_AGE_DAYS,
+         AI_REQUIRED_FAMILIES, AI_GATE_MODE, AI_SIGNALS } from "./config.js";
 import { classifyGeo } from "./geo.js";
 
 // --- Title -------------------------------------------------------------------------------------
@@ -28,6 +29,27 @@ export function matchTitle(title) {
   if (!LEVELS.some((re) => re.test(t))) return null;
   const hit = DOMAINS.find((d) => d.re.test(t));
   return hit ? { family: hit.family, label: hit.label } : null;
+}
+
+// --- Is the PRODUCT an AI product? ---------------------------------------------------------------
+// A product role is only wanted when the thing being built is AI. The test deliberately weights the
+// TITLE heavily and requires more than a passing mention in the description — almost every tech
+// company now says "AI" somewhere in its boilerplate, and counting that would pass everything.
+
+/** @returns {{ai: boolean, why: string}} */
+export function isAiProduct(job = {}) {
+  const title = String(job.title || "");
+  if (AI_SIGNALS.some((re) => re.test(title))) return { ai: true, why: "the title names AI" };
+  const desc = String(job.description || "");
+  if (!desc) return { ai: false, why: "no description to judge from" };
+  // Count DISTINCT signal families, not raw mentions: one boilerplate "we use AI" line hits once,
+  // a genuine AI product hits several different ways (model, agent, inference, ML…).
+  const hits = AI_SIGNALS.filter((re) => re.test(desc)).length;
+  // And require the AI wording to sit near the PRODUCT, not just in the company blurb.
+  const nearProduct = /\b(ai|ml|llm|genai|generative|agentic|model)\b[^.]{0,80}\b(product|platform|feature|roadmap|engine|assistant|copilot|tool)\b|\b(product|platform|roadmap)\b[^.]{0,80}\b(ai|ml|llm|genai|generative|agentic)\b/i.test(desc);
+  if (hits >= 3 && nearProduct) return { ai: true, why: `description describes an AI product (${hits} signal types)` };
+  if (hits >= 2 && nearProduct) return { ai: true, why: "description ties AI to the product" };
+  return { ai: false, why: hits ? `AI mentioned ${hits}× but not as the product` : "no AI signals in the posting" };
 }
 
 // --- Company -----------------------------------------------------------------------------------
@@ -175,6 +197,16 @@ export function screen(job = {}, opts = {}) {
   if (!comp.ok) return fail("comp", comp.reason);
   if (comp.flag) flags.push(comp.flag);
 
+  // A product role must be for an AI product. Other families are wanted from any industry.
+  let aiVerdict = null;
+  if (AI_REQUIRED_FAMILIES.includes(band.family)) {
+    aiVerdict = isAiProduct(job);
+    if (!aiVerdict.ai) {
+      if (AI_GATE_MODE === "reject") return fail("not_ai_product", `product role but ${aiVerdict.why}`);
+      flags.push("⚠ not an AI product");
+    }
+  }
+
   // Geo last: it reads the whole description, and it's the gate most likely to need the LLM.
   const geo = classifyGeo(job);
   flags.push(...geo.flags);
@@ -186,6 +218,8 @@ export function screen(job = {}, opts = {}) {
     family: band.family,
     geo,
     salary: comp.salary,
+    // null when the family doesn't require AI at all — absence is not a failure.
+    ai: aiVerdict,
     flags,
     reason: geo.reason,
     stage: null,

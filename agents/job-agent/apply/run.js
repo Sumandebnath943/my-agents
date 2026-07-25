@@ -12,12 +12,19 @@
 //
 // Usage (normally dispatched by .github/workflows/job-apply.yml):
 //   node agents/job-agent/apply/run.js --id <job_id> --mode prepare|submit
+import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../../lib/env.js";
 import { isUrlSafe } from "../../../lib/scrape.js";
+import { callLLM } from "../../../lib/llm.js";
 import { loadAnswers } from "./answers.js";
 import { detectAts, ATS, planForm, summarizePlan, normalizeLabel } from "./forms.js";
+
+// Only needed to ground essay drafts. Absent CV just means essays stay unanswered and block —
+// never that something gets invented.
+let CV = process.env.CV_TEXT || "";
+if (!CV) { try { CV = readFileSync(new URL("../cv.md", import.meta.url), "utf8"); } catch {} }
 
 const BUCKET = "job-agent";
 const arg = (name, fallback = "") => {
@@ -125,7 +132,12 @@ try {
       return (r.width > 0 || r.height > 0) && s.visibility !== "hidden" && s.display !== "none";
     };
     const out = [];
+    const radioGroups = new Map();
     for (const el of document.querySelectorAll("input, select, textarea")) {
+      // Greenhouse renders an invisible `required` shim next to every react-select
+      // (`aria-hidden="true" tabindex="-1"`). It is not a field, and it reported as a REQUIRED
+      // question with no name at all.
+      if (el.getAttribute("aria-hidden") === "true" || el.getAttribute("tabindex") === "-1") continue;
       if (el.type === "hidden" || !visible(el)) continue;
       const kind = el.type === "file" ? "file"
         : el.tagName === "SELECT" ? "select"
@@ -134,17 +146,30 @@ try {
         : el.type === "checkbox" ? "checkbox"
         : el.type === "radio" ? "radio"
         : "text";
-      const label = String(labelFor(el)).replace(/\s+/g, " ").trim().slice(0, 160);
+      const label = String(labelFor(el)).replace(/\s+/g, " ").trim().slice(0, 300);
+      const required = el.getAttribute("aria-required") === "true" || el.required === true;
+      const selector = el.id ? `#${CSS.escape(el.id)}` : el.name ? `${el.tagName.toLowerCase()}[name="${el.name}"]` : "";
+
+      // Radios sharing a name are ONE question. Reading each option as its own question is what
+      // produced "Immediate Joiner" / "Within 30 days" / "30 - 60 Days" as separate things to
+      // answer, when the real question was "Notice period" one level up.
+      if (kind === "radio" && el.name) {
+        if (!radioGroups.has(el.name)) {
+          const legend = el.closest("fieldset")?.querySelector("legend");
+          const groupBox = el.closest("[class*=field], [class*=question], .form-group, fieldset");
+          const heading = groupBox?.querySelector("legend, label, [class*=label], [class*=title]");
+          radioGroups.set(el.name, {
+            label: textOf(legend) || textOf(heading) || label,
+            kind: "radio-group", required, selector, name: el.name, id: el.id || "", options: [],
+          });
+        }
+        radioGroups.get(el.name).options.push({ label: label || el.value, selector });
+        continue;
+      }
       if (!label) continue;
-      out.push({
-        label,
-        kind,
-        required: el.getAttribute("aria-required") === "true" || el.required === true,
-        selector: el.id ? `#${CSS.escape(el.id)}` : el.name ? `${el.tagName.toLowerCase()}[name="${el.name}"]` : "",
-        name: el.name || "",
-        id: el.id || "",
-      });
+      out.push({ label, kind, required, selector, name: el.name || "", id: el.id || "" });
     }
+    for (const [, g] of radioGroups) out.push(g);
     return out;
   });
   console.log(`Discovered ${fields.length} field(s) on the ${ats} form.`);
@@ -152,6 +177,48 @@ try {
   // geo_class decides whether a country-neutral "authorized to work here?" is safe to answer.
   const plan = planForm(fields, answers, { geo: job.geo_class, learned });
   console.log(summarizePlan(plan));
+
+  // A form we can barely read produces a filled-in mess plus a list of machine names to "answer".
+  // Better to say so and hand it to the packet flow than to pretend.
+  if (!plan.worthAutomating) {
+    const why = plan.blockingUnreadable.length
+      ? `${plan.blockingUnreadable.length} required field(s) can't be read by the agent`
+      : `only ${plan.coverage}% of this form could be filled`;
+    console.log(`Not worth automating — ${why}. Handing over to the apply-by-hand packet.`);
+    await setState({
+      apply_state: "unsupported",
+      apply_form: { ats, apply_url: applyUrl, coverage: plan.coverage, summary: summarizePlan(plan),
+        unreadable: plan.unreadable.map((f) => ({ name: f.name, id: f.id, required: !!f.required })), at: new Date().toISOString() },
+      apply_error: `${why} — use the apply-by-hand packet.`,
+    });
+    process.exit(0);
+  }
+
+  // Essays are company-specific, so a stored answer can't be reused. The scorer already wrote a
+  // grounded cover letter for THIS role; draft from that and let the owner edit before submitting.
+  // Never used for pay, notice period or anything legal — isEssayQuestion() excludes those.
+  for (const e of plan.essays.filter((x) => x.status === "needs_draft")) {
+    try {
+      const draft = await callLLM(
+        `Answer this job-application question as the candidate, in first person, 80-120 words.
+Ground every claim ONLY in the CV and cover letter below — invent nothing.
+Plain, direct sentences. No buzzwords, no flattery, no "I am passionate about".
+Return ONLY the answer text.
+
+QUESTION: ${e.label}
+ROLE: ${job.title} at ${job.company}
+COVER LETTER ALREADY WRITTEN FOR THIS ROLE:\n${(job.cover_letter || "").slice(0, 1200)}
+CV:\n${CV.slice(0, 2500)}`,
+      );
+      const text = String(draft || "").trim();
+      if (text) { e.value = text; e.status = "filled"; e.drafted = true; plan.fills.push(e); }
+    } catch (err) {
+      console.error(`  essay draft failed for "${e.label}": ${err.message}`);
+    }
+  }
+  // Re-derive what still blocks now that essays may have been drafted.
+  plan.blocking = plan.blocking.filter((f) => !(f.key === "essay" && f.status === "filled"));
+  plan.canSubmit = plan.blocking.length === 0 && plan.blockingUnreadable.length === 0;
 
   // Note which learned answers actually got used — cheap signal for which ones are earning their
   // keep. Best-effort: a failure here must never affect the application.

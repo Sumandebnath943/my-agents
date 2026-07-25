@@ -63,8 +63,26 @@ const PATTERNS = [
   // The polarity test is the REQUIRE-VERB, not the word "sponsorship" — that was a real bug:
   // "Do you require work authorization?" contains no "sponsorship", fell through to the
   // authorization pattern, and was answered "Yes", i.e. "yes, I need sponsorship". Backwards.
-  ["needs_sponsorship",   /\b(require|requires|required|need|needs|needed|request|requesting|seek|seeking|obtain)\b[^?]{0,40}\b(sponsorship|visa|work\s*authoriz\w*|work\s*permit|immigration)\b/i],
-  ["authorized_to_work",  /\b(authoriz\w*\s*to\s*work|legally\s*authoriz|eligible\s*to\s*work|permitted\s*to\s*work|right\s*to\s*work|work\s*permit|work\s*authoriz)/i],
+  // The survey found FIFTEEN distinct wordings across 186 forms. The window is widened to 80 chars
+  // because real phrasings are long: "Will you now or will you in the future require employment
+  // visa sponsorship to work in the country in which the job you're applying for is located?"
+  ["needs_sponsorship",   /\b(require|requires|required|need|needs|needed|request|requesting|seek|seeking|commence|obtain)\b[^?]{0,80}\b(sponsorship|sponsor|visa|work\s*authoriz\w*|work\s*permit|immigration)\b/i],
+  ["authorized_to_work",  /\b(authoriz\w*\s*to\s*work|authorised\s*to\s*work|legally\s*authoriz|eligible\s*to\s*work|permitted\s*to\s*work|right\s*to\s*work|work\s*permit|work\s*authoriz|legal\s*authoriz\w*\s*to\s*work)/i],
+  // Company-history questions. Almost always "No", and they appear on 2.1% of required fields.
+  ["worked_here_before",  /\b(previously|ever|before)\b[^?]{0,60}\b(work(ed)?|employ(ed|ment)|consult(ed)?|intern(ed)?)\b[^?]{0,40}\b(at|for|with|by|here)\b|\bhave you (ever )?(been employed|worked)\b/i],
+  ["relative_at_company", /\b(relative|family member|friend|spouse|partner)\b[^?]{0,50}\b(work|employ)/i],
+  // Work-preference questions the survey turned up as commonly required.
+  ["willing_hybrid",      /\bhybrid\b|\b\d\s*days?\s*(per|a)\s*week\s*(in|from)\s*(the\s*)?office\b|\bwork\s*from\s*(the\s*)?office\b/i],
+  ["work_location_intent",/\bfrom where do you (intend|plan) to work\b|\bwhere (will|would) you be working\b|\bwhere do you intend to work\b/i],
+  // Education block (Greenhouse renders these as School / Degree / Discipline / dates).
+  ["school",              /\b(school|university|college|institution)\b/i],
+  ["degree",              /\bdegree\b/i],
+  ["discipline",          /\b(discipline|field of study|major|specialisation|specialization)\b/i],
+  ["edu_end_year",        /\b(end|graduation|completion)\s*(date\s*)?year\b/i],
+  ["edu_start_year",      /\bstart\s*(date\s*)?year\b/i],
+  ["zip_code",            /\b(zip|postal)\s*code\b/i],
+  ["preferred_name",      /\bpreferred\s*(first\s*)?name\b|\bname you'?d prefer\b|\bname you go by\b/i],
+  ["legal_name",          /\blegal\s*name\b/i],
   ["linkedin",            /\blinked\s*-?\s*in\b/i],
   ["github",              /\bgit\s*hub\b/i],
   ["twitter",             /\btwitter\b|\bx\.com\b/i],
@@ -130,6 +148,92 @@ const DEMOGRAPHIC_RE = new RegExp([
 /** Is this a demographic / self-identification question? */
 export const isDemographic = (label) => DEMOGRAPHIC_RE.test(String(label || ""));
 
+// --- Label hygiene -------------------------------------------------------------------------------
+// A survey of 186 real Greenhouse/Lever forms (483 distinct questions) found that 9.4% of everything
+// reported as a REQUIRED question was not a question at all — it was a dropdown placeholder
+// ("Select…", 91 occurrences), a textarea placeholder ("Type your response", 63), a button caption
+// ("Attach", "Apply", "resume_upload_button"), or the first OPTION of a radio group read as if it
+// were the group's question ("Yes", 49, with options [Yes|No]). Those must never reach the user as
+// something to answer.
+
+/** Placeholder / button text that masquerades as a label. */
+const NOISE_LABEL_RE = /^(select\s*\.{0,3}|choose\s*\.{0,3}|type your response|please select|start typing|search|attach|apply|upload|browse|drag and drop|add|none|n\/?a|other|yes|no|true|false|ok|submit|next|continue|—|-|\*)$/i;
+
+/** Machine identifiers: `cards[eab2039f-…][field0]`, `opportunityLocationId`, bare uuids. */
+const MACHINE_NAME_RE = /[[\]{}]|^[a-f0-9]{8}-[a-f0-9]{4}-|_(button|input|field|id)$|^[a-z]+(?:[A-Z][a-z]+){1,}$/;
+
+/** Widget status text a container-label read scoops up along with the real question. */
+const UI_NOISE_RE = new RegExp([
+  /couldn'?t auto-?read( resume)?/.source,
+  /analy[sz]ing resume\.*/.source,
+  /success!?/.source,
+  /attach resume\/?(cv)?/.source,
+  /no location found/.source,
+  /try entering a different location/.source,
+  /loading\.*/.source,
+  /drag and drop/.source,
+  /or paste/.source,
+  /max(imum)? file size[^,.]*/.source,
+  /\.pdf,? ?\.docx?/.source,
+  /accepted file types[^,.]*/.source,
+].join("|"), "gi");
+
+// Leading/trailing punctuation left behind once noise phrases are removed. A trailing "?" is
+// DELIBERATELY kept — it's part of the question, and stripping it turned "…require sponsorship?"
+// into a statement.
+const EDGE_PUNCT_RE = /^[\s.,;:!?/|·—–-]+|[\s.,;:!/|·—–-]+$/g;
+
+/**
+ * Turn a raw DOM-derived string into a question worth showing a human, or "" if it isn't one.
+ * Returning "" means "the agent could not identify this field" — which is honest, and very
+ * different from "the user needs to answer this".
+ */
+export function cleanLabel(raw) {
+  let s = String(raw || "").replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  s = s.replace(/[✱*†‡]+/g, " ");
+  s = s.replace(UI_NOISE_RE, " ").replace(/\s+/g, " ").trim();
+  s = s.replace(EDGE_PUNCT_RE, "").replace(/\s+/g, " ").trim();
+  // A container read can concatenate a question with the following field's text; keep the first
+  // sentence/question, which is the part that actually asks something.
+  const firstQ = s.match(/^(.{6,200}?\?)/);
+  if (firstQ) s = firstQ[1].trim();
+  if (!s || s.length < 2) return "";
+  if (NOISE_LABEL_RE.test(s)) return "";
+  if (MACHINE_NAME_RE.test(s) && !/\s/.test(s)) return "";   // machine names never contain spaces
+  return s.slice(0, 160);
+}
+
+/** Could the agent identify this field at all? */
+export const isIdentifiable = (label) => cleanLabel(label).length > 0;
+
+// --- Consent ------------------------------------------------------------------------------------
+// Required on 3.3% of forms, so a form cannot be submitted without them. Owner's decision: routine
+// privacy acknowledgements may be ticked; anything authorising a BACKGROUND, REFERENCE or CREDIT
+// check is never ticked by the agent and blocks submission instead.
+const BG_CHECK_RE = /\b(background\s*(check|verification|screening)|bgv|reference\s*check|credit\s*check|criminal|police\s*clearance|drug\s*(test|screen)|right\s*to\s*work\s*check)\b/i;
+const PRIVACY_CONSENT_RE = /\b(privacy\s*(notice|policy|statement)|data\s*(protection|processing)|candidate\s*privacy|acknowledge|acknowledged|i\s*agree|terms|gdpr|consent\s*to\s*(the\s*)?(processing|storage))\b/i;
+
+/** @returns {"privacy"|"background_check"|null} */
+export function consentKind(label) {
+  const s = String(label || "");
+  if (BG_CHECK_RE.test(s)) return "background_check";
+  if (PRIVACY_CONSENT_RE.test(s)) return "privacy";
+  return null;
+}
+
+// --- Essays -------------------------------------------------------------------------------------
+// "Why do you want to work at X?" — company-specific, so a stored answer can't be reused. The
+// scorer already writes a grounded cover letter for the same role; these get drafted from it and
+// shown for editing. NEVER used for pay, notice period or anything legal.
+const ESSAY_RE = /^(why\b|what\b.{0,40}(excites|interests|draws|attracts)|tell us|describe|share\b|in your own words|which\b.{0,40}(value|product|feature))/i;
+
+export const isEssayQuestion = (label, kind) =>
+  (kind === "textarea" || String(label || "").length > 45) &&
+  ESSAY_RE.test(String(label || "").trim()) &&
+  !isDemographic(label) &&
+  !/salary|ctc|compensation|notice period|visa|sponsor|authoriz/i.test(String(label || ""));
+
 /**
  * Stable key for "the same question asked again". Forms decorate labels with required-markers,
  * company names and stray whitespace ("Phone ✱", "Expected CTC*"), so a raw-string lookup would
@@ -194,25 +298,65 @@ export function answerFor(field, answers = {}, ctx = {}) {
  * @returns {{fills: Array, skipped: Array, unanswered: Array, blocking: Array, canSubmit: boolean}}
  */
 export function planForm(fields = [], answers = {}, ctx = {}) {
-  const fills = [], skipped = [], unanswered = [];
+  const fills = [], skipped = [], unanswered = [], unreadable = [], consents = [], essays = [];
   for (const f of fields) {
     if (!f || f.kind === "file") continue;                 // files are handled by the driver
-    const r = answerFor(f, answers, ctx);
-    const row = { ...f, ...r };
+
+    // 1. Could we even identify it? An unidentifiable field is the agent's problem to report, NOT
+    //    a question to put in front of the user — that is what produced "cards[eab…][field0]".
+    const label = cleanLabel(f.label);
+    if (!label) { unreadable.push({ ...f, reason: "no readable label" }); continue; }
+    const field = { ...f, label };
+
+    // 2. Consent. Privacy acknowledgements may be ticked; background/reference checks never are.
+    const consent = consentKind(label);
+    if (consent) {
+      const row = { ...field, consent, status: consent === "privacy" ? "filled" : "unanswered", value: consent === "privacy" ? "Yes" : null, key: "consent" };
+      consents.push(row);
+      if (consent === "privacy") fills.push(row); else unanswered.push(row);
+      continue;
+    }
+
+    // 3. Essays get drafted from the CV + the role's cover letter, for the owner to edit.
+    if (isEssayQuestion(label, f.kind)) {
+      const learned = ctx.learned?.[normalizeLabel(label)];
+      const row = { ...field, key: "essay", value: learned || null, status: learned ? "filled" : "needs_draft" };
+      essays.push(row);
+      if (learned) fills.push(row); else unanswered.push(row);
+      continue;
+    }
+
+    const r = answerFor(field, answers, ctx);
+    const row = { ...field, ...r };
     if (r.status === "filled") fills.push(row);
     else if (r.status === "skipped") skipped.push(row);
     else unanswered.push(row);
   }
-  // Only REQUIRED questions we couldn't answer stop the application. An optional blank is fine.
+
+  // Only REQUIRED items stop the application. An unreadable REQUIRED field is fatal for automation:
+  // we can't fill it and we can't sensibly ask about it, so the role goes to hand-apply.
   const blocking = [...unanswered, ...skipped].filter((f) => f.required);
-  return { fills, skipped, unanswered, blocking, canSubmit: blocking.length === 0 };
+  const blockingUnreadable = unreadable.filter((f) => f.required);
+  const answerable = fills.length;
+  const total = fills.length + unanswered.length + skipped.length + unreadable.length;
+  return {
+    fills, skipped, unanswered, unreadable, consents, essays, blocking, blockingUnreadable,
+    coverage: total ? Math.round((answerable / total) * 100) : 100,
+    canSubmit: blocking.length === 0 && blockingUnreadable.length === 0,
+    // Worth attempting at all? A form we can barely read wastes a run and produces the nonsense
+    // question list the owner saw. Below this, the dashboard offers the hand-apply packet instead.
+    worthAutomating: blockingUnreadable.length === 0 && (total === 0 || answerable / total >= 0.5),
+  };
 }
 
 /** A short human summary for the dashboard / email. */
 export function summarizePlan(plan) {
-  const parts = [`${plan.fills.length} field(s) filled`];
+  const parts = [`${plan.fills.length} field(s) filled (${plan.coverage}% coverage)`];
   if (plan.skipped.length) parts.push(`${plan.skipped.length} demographic question(s) left blank`);
-  if (plan.unanswered.length) parts.push(`${plan.unanswered.length} unanswered`);
+  if (plan.consents.length) parts.push(`${plan.consents.length} consent box(es)`);
+  if (plan.essays.length) parts.push(`${plan.essays.length} essay question(s)`);
+  if (plan.unreadable.length) parts.push(`${plan.unreadable.length} field(s) the agent couldn't read`);
   if (plan.blocking.length) parts.push(`BLOCKED on ${plan.blocking.length} required question(s)`);
+  if (plan.blockingUnreadable.length) parts.push(`BLOCKED: ${plan.blockingUnreadable.length} required field(s) unreadable — apply by hand`);
   return parts.join(" · ");
 }

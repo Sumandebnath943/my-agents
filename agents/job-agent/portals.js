@@ -50,7 +50,11 @@ export const PORTALS = [
 // A search result is only a job POSTING if its URL looks like one. Portals also publish company
 // pages, blog posts and "top 10 jobs in Pune" listicles, which must never reach the scorer.
 const JOB_URL_RE = {
-  naukri:         /naukri\.com\/job-listings-|naukri\.com\/.+-jobs?-/i,
+  // ONLY `job-listings-<slug>-<id>` is an actual posting. The old second alternative
+  // (`.+-jobs?-`) also matched SEARCH RESULT pages like `/marketing-jobs-in-bangalore` and
+  // `/product-marketing-manager-jobs-in-pune`, which is why Naukri results were arriving as links
+  // to a list of jobs rather than to a job.
+  naukri:         /naukri\.com\/job-listings-/i,
   instahyre:      /instahyre\.com\/(job|j)\//i,
   cutshort:       /cutshort\.io\/job\//i,
   hirist:         /hirist\.(tech|com)\/j\//i,
@@ -135,10 +139,22 @@ export function toCandidate(result, portal) {
   };
 }
 
-/** Every portal × query pair, in a stable order so the rotation cursor means something. */
+/**
+ * Every portal × query pair, INTERLEAVED so consecutive pairs use different queries.
+ *
+ * The obvious nesting (`for query { for portal }`) groups all nine portals of query 1 together,
+ * so a 20-search run only ever covered the first two or three queries — brand manager didn't come
+ * up until run 2, and performance/digital marketing not for days. Every run must sample the whole
+ * breadth of what the owner is looking for, not exhaust one phrase at a time.
+ */
 export function buildPairs(portals = PORTALS, queries = PORTAL_QUERIES) {
   const pairs = [];
-  for (const q of queries) for (const p of portals) pairs.push({ portal: p, query: q });
+  const total = queries.length * portals.length;
+  for (let i = 0; i < total; i++) {
+    const q = queries[i % queries.length];
+    const p = portals[Math.floor(i / queries.length) % portals.length];
+    pairs.push({ portal: p, query: q });
+  }
   return pairs;
 }
 

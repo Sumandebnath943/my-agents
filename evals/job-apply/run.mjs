@@ -11,7 +11,8 @@
 // Pure + offline — no browser, no DB, no LLM.
 import "../_env.mjs";
 import { runCases, isMain } from "../_lib.mjs";
-import { detectAts, classifyQuestion, isDemographic, answerFor, planForm, ATS, normalizeLabel, authAnswerableFor } from "../../agents/job-agent/apply/forms.js";
+import { detectAts, classifyQuestion, isDemographic, answerFor, planForm, ATS, normalizeLabel, authAnswerableFor,
+         cleanLabel, isIdentifiable, consentKind, isEssayQuestion } from "../../agents/job-agent/apply/forms.js";
 import { loadAnswers } from "../../agents/job-agent/apply/answers.js";
 
 // Deliberately SYNTHETIC values. This repo is public — the real figures live only in the
@@ -245,7 +246,94 @@ export function run() {
   ];
   const cfgRes = runCases("job-apply · ATS config sanity", atsCfgCases, (c) => ({ ok: !!c.check() }));
 
-  return [atsRes, qRes, demoRes, aRes, authRes, learnRes, normRes, planRes, loadRes, cfgRes];
+  // --- label hygiene ----------------------------------------------------------------------------
+  // Grounded in a survey of 186 real Greenhouse/Lever forms: 9.4% of everything reported as a
+  // REQUIRED question was a placeholder, a button caption, a machine name, or the first OPTION of
+  // a radio group. None of those may ever reach the owner as something to answer.
+  const labelCases = [
+    { id: "dropdown placeholder 'Select...'", raw: "Select...", want: "" },
+    { id: "textarea placeholder", raw: "Type your response", want: "" },
+    { id: "button caption 'Attach'", raw: "Attach", want: "" },
+    { id: "button caption 'Apply'", raw: "Apply", want: "" },
+    { id: "radio option read as question", raw: "Yes", want: "" },
+    { id: "machine name with brackets", raw: "cards[eab2039f-b7ab-4b2e-9e72-c0be6e087013][field0]", want: "" },
+    { id: "camelCase machine id", raw: "opportunityLocationId", want: "" },
+    { id: "upload button name", raw: "resume_upload_button", want: "" },
+    { id: "empty", raw: "", want: "" },
+    { id: "strips the required marker", raw: "Expected CTC ✱", want: "Expected CTC" },
+    { id: "strips widget status text", raw: "Current location ✱No location found. Try entering a different locationLoading", want: "Current location" },
+    { id: "strips resume widget noise", raw: "Resume/CV ✱ATTACH RESUME/CVCouldn't auto-read resume.Analyzing resume...Success!", want: "Resume/CV" },
+    { id: "keeps a real question", raw: "Will you now or in the future require sponsorship?", want: "Will you now or in the future require sponsorship?" },
+    { id: "keeps a multi-word label", raw: "Current Company", want: "Current Company" },
+  ];
+  const labelRes = runCases("job-apply · label hygiene (real survey findings)", labelCases, (c) => {
+    const got = cleanLabel(c.raw);
+    return { ok: got === c.want, note: got === c.want ? "" : `got "${got}"` };
+  });
+
+  // --- consent ------------------------------------------------------------------------------------
+  const consentCases = [
+    { id: "privacy notice -> tickable", q: "Applicant Privacy Notice", want: "privacy" },
+    { id: "acknowledge privacy policy -> tickable", q: "Please acknowledge that you've read and understand our Recruitment Privacy Policy", want: "privacy" },
+    { id: "I acknowledge -> tickable", q: "I acknowledge", want: "privacy" },
+    { id: "BACKGROUND CHECK -> never ticked", q: "Do you provide your consent for us to conduct your background verification (BGV) and reference checks?", want: "background_check" },
+    { id: "reference check -> never ticked", q: "I consent to a reference check", want: "background_check" },
+    { id: "credit check -> never ticked", q: "Do you consent to a credit check?", want: "background_check" },
+    { id: "an ordinary question is not consent", q: "Current Company", want: null },
+  ];
+  const consentRes = runCases("job-apply · consent (privacy yes, background checks never)", consentCases, (c) => {
+    const got = consentKind(c.q);
+    return { ok: got === c.want, note: got === c.want ? "" : `got ${got}` };
+  });
+
+  // --- essays -------------------------------------------------------------------------------------
+  const essayCases = [
+    { id: "why do you want to work here", q: "Why do you want to work at Figma?", kind: "textarea", want: true },
+    { id: "what excites you", q: "What excites you most about this opportunity?", kind: "textarea", want: true },
+    { id: "which value resonates", q: "Which of our values resonates most with you and why?", kind: "textarea", want: true },
+    { id: "salary is NEVER an essay", q: "Why do you think you deserve this expected CTC?", kind: "textarea", want: false },
+    { id: "visa is NEVER an essay", q: "Why do you require visa sponsorship?", kind: "textarea", want: false },
+    { id: "demographic is NEVER an essay", q: "Describe your gender identity", kind: "textarea", want: false },
+    { id: "a short text field is not an essay", q: "Current Company", kind: "text", want: false },
+  ];
+  const essayRes = runCases("job-apply · essay detection", essayCases, (c) => {
+    const got = !!isEssayQuestion(c.q, c.kind);
+    return { ok: got === c.want, note: got === c.want ? "" : `got ${got}` };
+  });
+
+  // --- the whole plan, with real-world field shapes ------------------------------------------------
+  const realish = [
+    { label: "First Name", required: true, kind: "text", selector: "#first_name" },
+    { label: "Email", required: true, kind: "text", selector: "#email" },
+    { label: "Phone", required: true, kind: "text", selector: "#phone" },
+    { label: "Select...", required: true, kind: "combobox", selector: "#c1" },
+    { label: "cards[eab2039f][field0]", required: true, kind: "text", selector: "#c2" },
+    { label: "Gender", required: false, kind: "combobox", selector: "#g" },
+    { label: "Applicant Privacy Notice", required: true, kind: "checkbox", selector: "#p" },
+  ];
+  const planRealCases = [
+    { id: "unreadable fields are NOT presented as questions",
+      check: (p) => p.blocking.every((f) => !/\[|Select\.\.\./.test(f.label)) },
+    { id: "unreadable fields are reported separately", check: (p) => p.unreadable.length === 2 },
+    { id: "a REQUIRED unreadable field blocks submission", check: (p) => !p.canSubmit && p.blockingUnreadable.length === 2 },
+    { id: "and makes the form not worth automating", check: (p) => p.worthAutomating === false },
+    { id: "privacy consent is ticked", check: (p) => p.consents.some((c) => c.consent === "privacy" && c.value === "Yes") },
+    { id: "coverage is reported", check: (p) => typeof p.coverage === "number" && p.coverage > 0 },
+  ];
+  const planRealRes = runCases("job-apply · plan on real-world field shapes", planRealCases, (c) => {
+    const p = planForm(realish, ANSWERS, { geo: "india_onsite" });
+    const ok = !!c.check(p);
+    return { ok, note: ok ? "" : `coverage=${p.coverage} unreadable=${p.unreadable.length} blocking=${JSON.stringify(p.blocking.map((f) => f.label))}` };
+  });
+
+  const bgCase = runCases("job-apply · background-check consent blocks", [
+    { id: "BGV consent is never auto-ticked and blocks", check: () => {
+      const p = planForm([{ label: "Do you consent to background verification (BGV)?", required: true, kind: "checkbox", selector: "#b" }], ANSWERS, {});
+      return !p.canSubmit && p.consents[0].consent === "background_check" && p.consents[0].value === null;
+    } },
+  ], (c) => ({ ok: !!c.check() }));
+
+  return [atsRes, qRes, demoRes, aRes, authRes, learnRes, normRes, planRes, loadRes, cfgRes, labelRes, consentRes, essayRes, planRealRes, bgCase];
 }
 
 if (isMain(import.meta.url)) {

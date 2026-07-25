@@ -78,6 +78,26 @@ export const TITLE_EXCLUDE = [
   /\b(user|product|ux)\s+research\w*\b/i,
 ];
 
+// --- AI-product requirement ---------------------------------------------------------------------
+// Owner's rule: a PRODUCT role (product management or product marketing) is only interesting if the
+// product itself is AI. A "Product Lead" for a conventional payments product is not — but this must
+// NOT be read as "no product roles", which is the opposite of the truth. The other families
+// (brand, marketing, digital, performance, comms, ops) are wanted from ANY industry.
+export const AI_REQUIRED_FAMILIES = ["pmm", "pm"];
+
+// Flag rather than reject, for now. A vaguely-written AI role would otherwise vanish silently, and
+// the detector has never been run in anger. Flip to "reject" once the flag proves accurate.
+export const AI_GATE_MODE = "flag";        // "flag" | "reject"
+
+// Signals that the PRODUCT is AI — not merely that the company mentions AI in its boilerplate.
+export const AI_SIGNALS = [
+  /\b(ai|a\.i\.|genai|gen\s*ai|generative\s*ai)\b/i,
+  /\b(llm|large language model|foundation model|transformer|diffusion)\b/i,
+  /\b(machine learning|deep learning|neural|nlp|natural language|computer vision)\b/i,
+  /\b(agentic|ai agent|copilot|chatbot|conversational ai|rag|retrieval augmented)\b/i,
+  /\b(ml\s*(ops|platform|engineer|model)|inference|fine[- ]tun\w+|prompt engineering|embeddings?)\b/i,
+];
+
 // --- Compensation ------------------------------------------------------------------------------
 // CRITICAL: this gate rejects ONLY when a posting DISCLOSES a range that sits entirely below the
 // floor. Most postings disclose nothing — those pass and are flagged "comp unknown". Rejecting on
