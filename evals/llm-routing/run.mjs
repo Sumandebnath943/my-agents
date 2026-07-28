@@ -4,7 +4,7 @@
 import "../_env.mjs";
 import { runCases, isMain } from "../_lib.mjs";
 import { CHAINS, AGENT_CHAIN, chainFor, VISION_PROVIDERS } from "../../lib/routing.js";
-import { callLLM } from "../../lib/llm.js";
+import { callLLM, _RPM, _OAI } from "../../lib/llm.js";
 
 const KNOWN = new Set(["openai", "gemini", "groq", "cerebras", "mistral", "openrouter"]);
 
@@ -26,6 +26,29 @@ export async function run() {
     return { ok: okProviders && hasModel, note: okProviders ? (hasModel ? "" : "missing openaiModel") : "unknown provider" };
   });
 
+  // Pacing safety. Two failure modes we've actually hit:
+  //   1. A provider's default model is retired, gets swapped, and the RPM map still holds the OLD
+  //      model name — so the new one silently inherits the 10-rpm fallback instead of its real limit.
+  //   2. A low-RPM provider sits EARLY in a chain, where a burst either 429s or forces a long gap on
+  //      every request. Cerebras is 5 req/min (verified from its rate-limit headers), so any chain
+  //      carrying both it and Mistral (30 rpm) must reach Mistral first.
+  const LOW_RPM_LAST = ["cerebras"]; // providers too rate-limited to lead a chain
+  const pacing = runCases("routing · pacing safety", [
+    ...Object.entries(_OAI)
+      .filter(([p]) => p !== "openai") // OpenAI is paid, generous, and priced separately
+      .map(([provider, cfg]) => ({
+        id: `rpm-entry-exists · ${provider} · ${cfg.defaultModel}`,
+        ok: typeof _RPM[cfg.defaultModel] === "number",
+      })),
+    ...Object.entries(CHAINS)
+      .filter(([, c]) => LOW_RPM_LAST.some((p) => c.order.includes(p)) && c.order.includes("mistral"))
+      .map(([name, c]) => ({
+        id: `low-rpm-provider-after-mistral · ${name}`,
+        ok: LOW_RPM_LAST.every((p) => !c.order.includes(p) || c.order.indexOf("mistral") < c.order.indexOf(p)),
+      })),
+    { id: "cerebras-rpm-matches-verified-free-tier", ok: _RPM["gpt-oss-120b"] === 5 },
+  ], (c) => ({ ok: c.ok }));
+
   // callLLM must fail cleanly (not hang / not hit network) when no keys are configured.
   for (const p of ["OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "CEREBRAS_API_KEY", "MISTRAL_API_KEY", "OPENROUTER_API_KEY"]) delete process.env[p];
   process.env.AGENT_NAME = "cto";
@@ -37,7 +60,7 @@ export async function run() {
     { id: "every-agent-maps-to-real-chain", ok: Object.values(AGENT_CHAIN).every((c) => CHAINS[c]) },
   ], (c) => ({ ok: c.ok }));
 
-  return [resolve, integrity, failsafe];
+  return [resolve, integrity, pacing, failsafe];
 }
 
 if (isMain(import.meta.url)) {
