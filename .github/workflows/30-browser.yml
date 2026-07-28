@@ -28,5 +28,10 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # The `vision` chain is gemini -> openai, and vision calls CANNOT degrade to text providers
+          # (Mistral/OpenRouter can't read images). Without this key the agent had exactly one
+          # provider and no fallback, so a single Gemini 429 failed the whole run. OpenAI is SECOND
+          # in the chain, so this adds no traffic — it is only reached once Gemini has already failed.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
