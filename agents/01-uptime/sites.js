@@ -6,7 +6,7 @@ export const SITES = [
   { name: "Legatus",            url: "https://legatus.houseofnamus.com/" },
   { name: "CITE",               url: "https://cite.houseofnamus.com/" },
   { name: "Slide Doctor",       url: "https://slidedoctor.houseofnamus.com/" },
-  { name: "Ember",              url: "https://ember.houseofnamus.com/" },
+  { name: "Ember",              url: "https://v0-meet-ember-ai.vercel.app/" },
   { name: "Crawl Daddy",        url: "https://crawldaddy.houseofnamus.com/" },
   { name: "Crawl Daddy App",    url: "https://crawldaddy--houseofnamus.replit.app/" },
   { name: "Brief Killer",       url: "https://briefkiller.houseofnamus.com/" },

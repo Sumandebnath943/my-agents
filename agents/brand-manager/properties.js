@@ -28,7 +28,7 @@ export const PROPERTIES = [
   { name: "Legatus", url: "https://legatus.houseofnamus.com/", tier: "perf" },
   { name: "CITE", url: "https://cite.houseofnamus.com/", tier: "perf" },
   { name: "Slide Doctor", url: "https://slidedoctor.houseofnamus.com/", tier: "perf" },
-  { name: "Ember", url: "https://ember.houseofnamus.com/", tier: "perf" },
+  { name: "Ember", url: "https://v0-meet-ember-ai.vercel.app/", tier: "perf" },
   { name: "Crawl Daddy", url: "https://crawldaddy.houseofnamus.com/", tier: "perf" },
   { name: "Brief Killer", url: "https://briefkiller.houseofnamus.com/", tier: "perf" },
   { name: "Brief Killer 2", url: "https://briefkiller2.houseofnamus.com/", tier: "perf" },
