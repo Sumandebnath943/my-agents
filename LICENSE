@@ -1,0 +1,63 @@
+Copyright (c) 2026 Suman Debnath. All rights reserved.
+
+                          PROPRIETARY LICENSE
+                     SOURCE-VISIBLE, NOT OPEN SOURCE
+
+This repository is made publicly VIEWABLE for portfolio, transparency, and
+educational-reference purposes only.
+
+Public visibility on GitHub does not grant a license. This software is NOT open
+source. No rights are transferred, waived, or implied by the fact that this
+source code can be read.
+
+------------------------------------------------------------------------------
+YOU MAY
+------------------------------------------------------------------------------
+
+  * View and read this source code.
+  * Reference or quote limited portions of it, with clear attribution to the
+    copyright holder, in commentary, review, journalism, or educational
+    discussion.
+  * Link to this repository.
+
+------------------------------------------------------------------------------
+YOU MAY NOT
+------------------------------------------------------------------------------
+
+Without the prior, express, written permission of the copyright holder, you may
+not, in whole or in part:
+
+  * Copy, reproduce, republish, mirror, or redistribute this software.
+  * Use it, deploy it, host it, or execute it for any purpose, whether
+    commercial or non-commercial, personal or organizational.
+  * Modify it, adapt it, translate it, or create derivative works from it.
+  * Incorporate any portion of it into another project, product, service,
+    repository, or codebase.
+  * Sell, sublicense, rent, lease, or otherwise commercially exploit it.
+  * Use it to train, fine-tune, evaluate, or otherwise develop any machine
+    learning model, or include it in any training corpus or dataset.
+  * Remove, alter, obscure, or misrepresent this notice, the copyright notice,
+    or the authorship of this work.
+
+The architecture, agent designs, orchestration patterns, prompts, and
+evaluation methodology contained in this repository are the original work of
+the copyright holder and are protected as such.
+
+------------------------------------------------------------------------------
+PERMISSIONS AND ENQUIRIES
+------------------------------------------------------------------------------
+
+To request permission for any use not expressly allowed above, contact the
+copyright holder. Permission, where granted, will be granted in writing and is
+limited to the scope stated in that writing.
+
+------------------------------------------------------------------------------
+NO WARRANTY
+------------------------------------------------------------------------------
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
