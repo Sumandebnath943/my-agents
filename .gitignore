@@ -23,3 +23,7 @@ PORTFOLIO_HANDOFF*.md
 PORTFOLIO_UPDATE_HANDOFF*.md
 MAS_SETUP*.md
 ECHO_SETUP*.md
+
+# Security posture record. Documents which protections are ON *and which are OFF*, which is
+# exactly the reconnaissance a public repo shouldn't hand out. Stays local.
+SECURITY_POSTURE*.md
