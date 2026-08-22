@@ -13,12 +13,32 @@
 // unanswered, which puts the whole application into `needs_input` and blocks submission. A wrong
 // answer on a real application is far worse than an application that waits for a human.
 
-/** Which ATS is this apply URL? null when we can't drive it. */
+/** Which ATS is this apply URL? null when we can't drive it.
+ *
+ * This function decides where the form driver is willing to type your NAME, EMAIL, PHONE and CTC,
+ * so it must match on the URL's HOSTNAME and nothing else. The previous version tested substrings
+ * of the whole URL (`u.includes("jobs.lever.co")`), which any attacker-controlled address could
+ * satisfy in its path — `https://evil.com/jobs.lever.co/apply` read as a genuine Lever form. The
+ * greenhouse regex had the same hole via a path segment like `/x.greenhouse.io/`.
+ *
+ * Parse, then compare the host exactly or as a subdomain. A non-URL (or a bare word) throws and
+ * is reported as "not drivable", which is the safe direction: run.js turns null into `unsupported`
+ * and asks for a manual application rather than guessing.
+ */
 export function detectAts(url) {
-  const u = String(url || "").toLowerCase();
-  if (/(^|\.)greenhouse\.io/.test(u) || u.includes("job-boards.greenhouse.io")) return "greenhouse";
-  if (u.includes("jobs.lever.co") || u.includes("hire.lever.co")) return "lever";
-  if (u.includes("ashbyhq.com")) return "ashby";
+  const raw = String(url || "").trim();
+  if (!raw) return null;
+  let host;
+  try {
+    // Tolerate a scheme-less "jobs.lever.co/acme/123" the way the old substring test did.
+    host = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  const on = (domain) => host === domain || host.endsWith(`.${domain}`);
+  if (on("greenhouse.io")) return "greenhouse";
+  if (on("lever.co")) return "lever";
+  if (on("ashbyhq.com")) return "ashby";
   return null;
 }
 

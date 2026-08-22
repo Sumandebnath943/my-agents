@@ -37,6 +37,16 @@ export function run() {
     { id: "naukri is not drivable", u: "https://www.naukri.com/job-listings-pmm-acme-123", want: null },
     { id: "linkedin is not drivable", u: "https://www.linkedin.com/jobs/view/4123456789/", want: null },
     { id: "empty url", u: "", want: null },
+    // Lookalike hosts. detectAts gates where real personal data gets typed, so a match must come
+    // from the HOSTNAME — never from a substring an attacker can put in the path or in a longer
+    // domain. Each of these was accepted by the old substring/regex version.
+    { id: "ats name in the PATH is not a match", u: "https://evil.com/jobs.lever.co/apply", want: null },
+    { id: "ats name as a domain PREFIX is not a match", u: "https://greenhouse.io.evil.com/jobs/1", want: null },
+    { id: "dotted path segment is not a subdomain", u: "https://evil.com/x.greenhouse.io/apply", want: null },
+    { id: "ashby lookalike domain is not a match", u: "https://ashbyhq.com.evil.net/a", want: null },
+    // Real hosts that must keep working.
+    { id: "lever hire subdomain", u: "https://hire.lever.co/acme/abc/apply", want: "lever" },
+    { id: "scheme-less lever url", u: "jobs.lever.co/acme/abc", want: "lever" },
   ];
   const atsRes = runCases("job-apply · ATS detection", atsCases, (c) => {
     const got = detectAts(c.u);
