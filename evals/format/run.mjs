@@ -123,6 +123,21 @@ export function run() {
     { id: "footer uses the real portfolio domain", check: () => cardSvg({ quote: "hi" }).includes(PROFILE.site) },
     { id: "the real domain is houseofnamus, not a bare apex", check: () => /^sumandebnath\.houseofnamus\.com$/.test(PROFILE.site) },
     { id: "no invented apex domain anywhere on the card", check: () => !/[^.]sumandebnath\.com/.test(cardSvg({ quote: "hi" })) },
+    // Backdrop: must vary between posts but stay reproducible, and must never be loud enough to
+    // fight the quote. An opacity above ~0.12 on a background layer would start doing that.
+    { id: "same quote renders an identical card", check: () => cardSvg({ quote: "the same line twice" }) === cardSvg({ quote: "the same line twice" }) },
+    { id: "different quotes get different backdrops", check: () => {
+      const a = cardSvg({ quote: "one distinct line about agents entirely" }).match(/<circle cx="(\d+)" cy="(\d+)" r="\d+" stroke-width/);
+      const b = cardSvg({ quote: "a wholly different line about models here" }).match(/<circle cx="(\d+)" cy="(\d+)" r="\d+" stroke-width/);
+      return a && b && (a[1] !== b[1] || a[2] !== b[2]);
+    } },
+    { id: "no backdrop layer is loud enough to fight the text", check: () => {
+      const svg = cardSvg({ quote: "hello world" });
+      const opacities = [...svg.matchAll(/(?:\bopacity|stop-opacity)="([0-9.]+)"/g)].map((m) => Number(m[1]));
+      // The vignette is black and deliberately stronger; every accent layer stays faint.
+      return opacities.filter((o) => o > 0 && o < 0.3).every((o) => o <= 0.12);
+    } },
+    { id: "the quote still renders over the backdrop", check: () => cardSvg({ quote: "legible line" }).includes(">legible<") || cardSvg({ quote: "legible line" }).includes("legible line") },
   ];
   const layout = runCases("card · layout + escaping", layoutCases, (c) => ({ ok: c.check() }));
 

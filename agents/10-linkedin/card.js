@@ -98,6 +98,77 @@ export function pullQuote(post, { min = 40, max = 190 } = {}) {
 }
 
 /**
+ * Stable 32-bit hash of a string. Used to vary the backdrop per post so cards are not identical,
+ * while staying DETERMINISTIC — the same quote always renders the same card, which is what makes
+ * the output testable and reproducible.
+ */
+function seedOf(str) {
+  let h = 2166136261;
+  for (let i = 0; i < String(str).length; i++) {
+    h ^= String(str).charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/**
+ * Muted background artwork. Everything here sits at 3–7% opacity: enough to kill the flatness of a
+ * solid fill, far too faint to compete with the quote. Built from the brand's own geometry — the
+ * MIGI disc, orbit rings, a dot grid — rather than generic decoration.
+ *
+ * Layer order matters: grid (texture) -> rings (structure) -> ghost disc (brand) -> glow (depth).
+ * A seed nudges positions so consecutive posts do not look like the same template.
+ */
+function backdrop(S, seed) {
+  const r1 = (seed % 100) / 100;              // 0..1
+  const r2 = ((seed >> 7) % 100) / 100;
+  const r3 = ((seed >> 13) % 100) / 100;
+
+  const ringCx = S * (0.74 + r1 * 0.18);      // off to the right, partly bleeding off-canvas
+  const ringCy = S * (0.16 + r2 * 0.14);
+  const ghostR = S * (0.30 + r3 * 0.06);
+  const ghostCx = S * (0.86 + r2 * 0.06);     // bottom-right, cropped by the edge
+  const ghostCy = S * (0.80 + r1 * 0.06);
+  // Deliberately NOT rotated. A rotated half-moon puts its straight chord on a diagonal, and even
+  // at 6% that hard edge reads as a rendering glitch rather than a watermark. Upright keeps the
+  // flat edge vertical, which reads as intentional — the same way any logo watermark sits upright.
+
+  // The ghost is the MIGI silhouette: disc minus half-moon, so the brand shape reads even at 5%.
+  const gm = ghostR * 0.79;
+
+  return `
+  <defs>
+    <pattern id="grid" width="46" height="46" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.6" fill="${BRAND.accent}" opacity="0.055"/>
+    </pattern>
+    <radialGradient id="glow" cx="18%" cy="12%" r="62%">
+      <stop offset="0%" stop-color="${BRAND.accent}" stop-opacity="0.062"/>
+      <stop offset="100%" stop-color="${BRAND.accent}" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="78%">
+      <stop offset="60%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.34"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="${S}" height="${S}" fill="url(#grid)"/>
+
+  <g stroke="${BRAND.accent}" fill="none" opacity="0.07">
+    <circle cx="${ringCx.toFixed(0)}" cy="${ringCy.toFixed(0)}" r="${(S * 0.30).toFixed(0)}" stroke-width="2"/>
+    <circle cx="${ringCx.toFixed(0)}" cy="${ringCy.toFixed(0)}" r="${(S * 0.44).toFixed(0)}" stroke-width="1.5"/>
+    <circle cx="${ringCx.toFixed(0)}" cy="${ringCy.toFixed(0)}" r="${(S * 0.58).toFixed(0)}" stroke-width="1"/>
+  </g>
+
+  <g transform="translate(${ghostCx.toFixed(0)} ${ghostCy.toFixed(0)})" opacity="0.055">
+    <circle cx="0" cy="0" r="${ghostR.toFixed(0)}" fill="${BRAND.accent}"/>
+    <path d="M 0 ${(-gm).toFixed(0)} A ${gm.toFixed(0)} ${gm.toFixed(0)} 0 0 0 0 ${gm.toFixed(0)} Z" fill="${BRAND.bg}"/>
+  </g>
+
+  <rect width="${S}" height="${S}" fill="url(#glow)"/>
+  <rect width="${S}" height="${S}" fill="url(#vignette)"/>`;
+}
+
+/**
  * The MIGI mark, drawn as vector rather than embedded as a bitmap: it stays sharp at any size,
  * adds no base64 weight, and carries no white background to clash with the dark card.
  * A lime disc with a dark half-moon bulging left — the flat edge sits on the disc's centre line.
@@ -149,6 +220,7 @@ export function cardSvg({
     </linearGradient>
   </defs>
   <rect width="${S}" height="${S}" fill="url(#bg)"/>
+  ${backdrop(S, seedOf(quote))}
   <rect x="0" y="0" width="14" height="${S}" fill="${BRAND.accent}"/>
 
   <text x="${pad}" y="150" font-size="26" font-weight="700" letter-spacing="3.5" fill="${BRAND.accent}" font-family="${BRAND.font}">${esc(kicker.toUpperCase())}</text>
