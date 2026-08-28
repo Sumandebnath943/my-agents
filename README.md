@@ -27,8 +27,11 @@ shared Supabase schema:
 
 ## Architecture
 
-**Scheduling.** 46 workflows, ~34 of them cron-scheduled, spread across the day. Each is
-pinned to `contents: read` — no workflow in the fleet has write access to the repository.
+**Scheduling.** 48 workflows, ~34 of them cron-scheduled, spread across the day and budgeted to
+about 53 scheduled events daily. Each is pinned to `contents: read` — no workflow in the fleet has
+write access to the repository. Cadence is deliberately conservative: GitHub throttles
+high-frequency `schedule` triggers, and a fleet that asks too often gets its dispatches delayed by
+hours rather than rate-limited outright.
 
 **Model routing.** Agents call a multi-provider layer spanning Groq, Gemini, Cerebras,
 Mistral, OpenRouter and OpenAI, with automatic failover and rate-limit-aware pacing so the
