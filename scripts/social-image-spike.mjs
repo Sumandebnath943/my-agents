@@ -67,10 +67,29 @@ if (!inst || !process.env.MASTODON_TOKEN) {
     const up = await fetch(`${inst}/api/v2/media`, {
       method: "POST", headers: { Authorization: `Bearer ${process.env.MASTODON_TOKEN}`, Accept: "application/json", "User-Agent": "migi/1.0" }, body: form,
     });
+    if (up.status === 401 || up.status === 403) {
+      throw new Error(`media ${up.status} — token is missing the write:media scope (write:statuses alone posts text but cannot attach images)`);
+    }
+    if (up.status === 413) throw new Error(`media 413 — ${bytes.length} bytes exceeds this instance's upload limit`);
     if (!up.ok && up.status !== 202) throw new Error(`media ${up.status}: ${(await up.text()).slice(0, 160)}`);
     const m = await up.json().catch(() => ({}));
     if (!m?.id) throw new Error("no media id returned");
-    console.log(`🐘 Mastodon: ✅ media accepted (HTTP ${up.status}) — id ${m.id}`);
+    console.log(`🐘 Mastodon: media accepted (HTTP ${up.status}) — id ${m.id}`);
+
+    // 202 means STILL PROCESSING. Attaching an unprocessed id makes POST /statuses fail with 422,
+    // so the real flow polls until ready — verify that the poll actually converges here.
+    if (up.status === 202) {
+      let ready = false;
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 800));
+        const chk = await fetch(`${inst}/api/v1/media/${m.id}`, {
+          headers: { Authorization: `Bearer ${process.env.MASTODON_TOKEN}`, Accept: "application/json", "User-Agent": "migi/1.0" },
+        });
+        if (chk.ok) { ready = true; console.log(`🐘 Mastodon: processing finished after ~${(i + 1) * 0.8}s`); break; }
+      }
+      if (!ready) throw new Error("media still processing after ~5s — the status post would have been rejected");
+    }
+    console.log("🐘 Mastodon: ✅ ready to attach");
     console.log("   (POST /statuses NOT called — nothing posted)"); ok++;
   } catch (e) { console.log(`🐘 Mastodon: ❌ ${e.message}`); failed++; }
 }
