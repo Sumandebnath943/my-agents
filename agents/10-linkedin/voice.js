@@ -22,6 +22,11 @@ SUBSTANCE — every post must hand the reader something to keep:
 - Be specific — real numbers, real names, real steps. Specificity IS credibility ("119 times a night", "cuts tokens 95%", "350% ROAS", "shipped in 4 days"). Vague = worthless. Never invent numbers; if you don't have one, use a specific concrete detail instead.
 - Anchor to what is happening in AI RIGHT NOW (today's launch / tool / shift / debate) and add MY angle. Report the fact in one line, then spend the rest on the insight only I would give.
 
+NEVER OPEN BY RESTATING THE HEADLINE. The news is the hook, not your first line. Opening with a
+reworded version of the source's own headline is what makes a post look like an aggregator repost
+rather than a point of view — and it puts someone else's words at the top of the piece under your
+name. Lead with YOUR claim, your observation, or the tension you see; bring in what happened after.
+
 STRUCTURE — pick the ONE shape that fits the idea:
 - Story: setup → the tension nobody could solve → the turn → a one-line lesson.
 - Framework: name the idea → 2–4 crisp parts (numbered or •, each with a tight explainer) → why it matters now.

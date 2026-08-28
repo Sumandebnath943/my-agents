@@ -71,6 +71,24 @@ export function normalizeListMarkers(text) {
 }
 
 /**
+ * Append a source credit, idempotently.
+ *
+ * WHY: the post's prose is original — measured 0% six-word overlap with the source article — but
+ * it is still *about* someone else's reporting, and shipping it with no acknowledgement reads as
+ * passing off. A plain text credit is deliberate: a raw URL in the body suppresses LinkedIn reach,
+ * so the link belongs in the first comment while the credit belongs in the post.
+ */
+export function withCredit(text, source) {
+  if (typeof text !== "string" || !text.trim()) return text;
+  const s = String(source || "").trim();
+  if (!s || s === "unknown") return text;
+  const line = `Via ${s}`;
+  const body = text.replace(/\s+$/, "");
+  if (new RegExp(`^via\\s+${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "im").test(body)) return body;
+  return `${body}\n\n${line}`;
+}
+
+/**
  * Append the agent signature, idempotently.
  * Returns the text unchanged when `sig` is empty or already present, so re-running an edit or a
  * regenerate can never stack two signatures on one post.

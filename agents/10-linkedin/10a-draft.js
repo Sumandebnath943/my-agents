@@ -16,11 +16,29 @@ import { PROFILE, profileContext } from "../../lib/profile.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { AI_FEEDS, SCRAPE_BLOCKED } from "./sources.js";
 import { scrapeClean } from "../../lib/scrape.js";
-import { normalizeListMarkers, withSignature } from "./format.js";
+import { normalizeListMarkers, withSignature, withCredit } from "./format.js";
 
 // Signature appended to every published post. Set LINKEDIN_SIGNATURE="" to switch it off entirely
 // without touching code; applied idempotently so regenerates never stack it.
 const POST_SIGNATURE = process.env.LINKEDIN_SIGNATURE ?? "🤖 Drafted by MIGI, my AI agent — edited and published by me.";
+
+// Publisher label for a link, so every pick says where it came from. Hand-mapped for the outlets
+// whose hostname doesn't read as a name; everything else falls back to the bare domain.
+const SOURCE_NAMES = {
+  "theverge.com": "The Verge", "venturebeat.com": "VentureBeat", "arstechnica.com": "Ars Technica",
+  "technologyreview.com": "MIT Tech Review", "techcrunch.com": "TechCrunch", "openai.com": "OpenAI",
+  "deepmind.google": "Google DeepMind", "huggingface.co": "Hugging Face",
+  "simonwillison.net": "Simon Willison", "ycombinator.com": "Hacker News", "github.com": "GitHub",
+  "anthropic.com": "Anthropic", "nytimes.com": "NYT", "wired.com": "WIRED", "bloomberg.com": "Bloomberg",
+};
+function sourceName(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    if (SOURCE_NAMES[host]) return SOURCE_NAMES[host];
+    const reg = host.split(".").slice(-2).join(".");
+    return SOURCE_NAMES[reg] || host;
+  } catch { return "unknown"; }
+}
 import { WRITING_PLAYBOOK, VALUE_BAR } from "./voice.js";
 import { referenceBlock } from "./references.js";
 import { rankWinners, winnersBlock, winnersStatus } from "./winners.js";
@@ -334,7 +352,8 @@ Voice bar: ${VALUE_BAR}`,
   // Deterministic clean-up AFTER the critic, which can itself reintroduce ragged numbering. The
   // playbook asks for consistent list markers; this guarantees it. Then sign, idempotently, so a
   // regenerate or an edit can never stack two signatures.
-  o.post = withSignature(normalizeListMarkers(o.post), POST_SIGNATURE);
+  // Credit BEFORE the signature so the order reads: post → who reported it → who drafted it.
+  o.post = withSignature(withCredit(normalizeListMarkers(o.post), item.source), POST_SIGNATURE);
 
   const hashtags = (await trendingHashtags(item.headline || "AI", { platform: "linkedin", count: 3 })).join(" ");
   const review = await safetyReview(o.post);
@@ -380,7 +399,7 @@ Return ONLY JSON {"post":"revised post text, formatted with real line breaks"}.`
   let revised = row.post; try { revised = stripMarkdown(parseJson(out).post || row.post); } catch {}
   // Same treatment as a fresh draft: an edit can just as easily produce a ragged list, and
   // withSignature is idempotent so re-signing an already-signed post is a no-op.
-  revised = withSignature(normalizeListMarkers(revised), POST_SIGNATURE);
+  revised = withSignature(withCredit(normalizeListMarkers(revised), row.source_url ? sourceName(row.source_url) : ""), POST_SIGNATURE);
   const review = await safetyReview(revised);
   if (review.hard) { await notifyTelegram(`🛑 Revised draft blocked by the safety filter (${review.reasons.join(", ")}). Not sent.`, { html: true }); process.exit(0); }
   const warning = review.safe ? null : review.reasons.join("; ");
@@ -431,23 +450,6 @@ if (process.env.NEWS_IDX) {
 }
 
 // ---------------- CURATE mode (default) ----------------
-// Publisher label for a link, so every pick says where it came from. Hand-mapped for the outlets
-// whose hostname doesn't read as a name; everything else falls back to the bare domain.
-const SOURCE_NAMES = {
-  "theverge.com": "The Verge", "venturebeat.com": "VentureBeat", "arstechnica.com": "Ars Technica",
-  "technologyreview.com": "MIT Tech Review", "techcrunch.com": "TechCrunch", "openai.com": "OpenAI",
-  "deepmind.google": "Google DeepMind", "huggingface.co": "Hugging Face",
-  "simonwillison.net": "Simon Willison", "ycombinator.com": "Hacker News", "github.com": "GitHub",
-  "anthropic.com": "Anthropic", "nytimes.com": "NYT", "wired.com": "WIRED", "bloomberg.com": "Bloomberg",
-};
-function sourceName(url) {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    if (SOURCE_NAMES[host]) return SOURCE_NAMES[host];
-    const reg = host.split(".").slice(-2).join(".");
-    return SOURCE_NAMES[reg] || host;
-  } catch { return "unknown"; }
-}
 
 async function readFeed(url) {
   try {

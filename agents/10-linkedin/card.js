@@ -72,29 +72,133 @@ export function fitText(text, { maxWidth, maxHeight, max = 78, min = 34, lineRat
  * hashtags and the agent signature so they never end up as the headline.
  */
 export function pullQuote(post, { min = 40, max = 190 } = {}) {
+  const best = candidateLines(post, { min, max })[0];
+  if (best) return best;
+  // Nothing sentence-shaped: fall back to the first substantial line so a card is still possible.
   const cleaned = String(post || "")
     .split("\n")
     .map((l) => l.replace(/^[\s]*(?:[0-9]{1,2}[.)]|[0-9]️?⃣|[•\-→*])\s*/, "").trim())
-    .filter((l) => l && !/^#/.test(l) && !/^🤖/.test(l) && !/^https?:\/\//.test(l))
+    .filter((l) => l && !/^#/.test(l) && !/^🤖/.test(l) && !/^via\s/i.test(l) && !/^https?:\/\//.test(l))
     .join("\n");
+  const first = cleaned.split("\n").find((l) => l.length > 12) || cleaned;
+  return first.slice(0, max).trim();
+}
 
-  const sentences = cleaned
+// Words too common to signal anything about substance. Dropped before comparing, so similarity
+// measures shared MEANING rather than shared grammar.
+const STOP = new Set("a an the and or but if then than that this these those to of in on at by for with from as is are was were be been being it its has have had how what when where why we you your our their they them i my me not no nor so such can could will would should may might must do does did".split(" "));
+
+const contentWords = (s) => new Set(
+  String(s || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w))
+);
+
+/**
+ * How much two lines share, 0..1, by content words and containment.
+ *
+ * Containment (over min) rather than Jaccard (over union) on purpose: a short headline swallowed
+ * whole by a longer sentence must score HIGH, and Jaccard would dilute that to look safe.
+ *
+ * Calibration on the real 2026-08-28 case: VentureBeat's "When agents act on their own, governance
+ * has to live in the data layer" against the card's "When agents act autonomously, governance has
+ * to live in the data layer" scores ~0.9. A genuinely independent line from the same post scores
+ * well under 0.4.
+ */
+export function similarity(a, b) {
+  const A = contentWords(a), B = contentWords(b);
+  if (!A.size || !B.size) return 0;
+  let shared = 0;
+  for (const w of A) if (B.has(w)) shared++;
+  return shared / Math.min(A.size, B.size);
+}
+
+/**
+ * Every usable sentence from a post, best-first — the same scoring pullQuote uses, exposed so a
+ * caller can walk past a candidate that is too close to the source.
+ */
+export function candidateLines(post, { min = 40, max = 190 } = {}) {
+  const cleaned = String(post || "")
+    .split("\n")
+    .map((l) => l.replace(/^[\s]*(?:[0-9]{1,2}[.)]|[0-9]️?⃣|[•\-→*])\s*/, "").trim())
+    .filter((l) => l && !/^#/.test(l) && !/^🤖/.test(l) && !/^via\s/i.test(l) && !/^https?:\/\//.test(l))
+    .join("\n");
+  return cleaned
     .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= min && s.length <= max);
+    .filter((s) => s.length >= min && s.length <= max)
+    .map((s, i) => ({ s, score: cardScore(s, i) }))
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.s);
+}
 
-  if (!sentences.length) {
-    const first = cleaned.split("\n").find((l) => l.length > 12) || cleaned;
-    return first.slice(0, max).trim();
+/**
+ * How card-worthy a sentence is.
+ *
+ * The first version simply preferred LONGER lines, which reliably picked the wrong sentence: on a
+ * real post it chose "In my work with AI-native products, I've seen how this data-layer approach
+ * kept the IMPRINT engine reliable and compliant" — supporting evidence — over "The future of AI
+ * isn't just about what agents can do, it's about how we control what they do", which is the
+ * actual claim. A card carries the claim.
+ */
+function cardScore(s, i) {
+  const len = s.length;
+  let score = 14 - Math.abs(len - 90) / 12;              // punchy beats long; peak around 90 chars
+  if (s.endsWith("?")) score -= 20;                       // a question cannot carry a card
+  if (/^(in my work|from my|i'?ve|i have|when i|in my experience)/i.test(s)) score -= 12;  // evidence, not the claim
+  if (/\b(isn'?t|aren'?t|not)\b.{0,45}\b(it'?s|they'?re|but)\b/i.test(s)) score += 5;      // contrast lands
+  if (i === 0) score += 3;
+  return score;
+}
+
+/**
+ * Choose the line the card is built from, guaranteeing it is not a restatement of the source.
+ *
+ * Order of preference:
+ *   1. the best candidate that is already sufficiently different from the source headline
+ *   2. failing that, a rephrase of the best candidate — but VERIFIED, not trusted. Rewording is
+ *      exactly what produced the original problem ("act on their own" -> "act autonomously" is a
+ *      rephrase, and still 92% the same headline), so a rewrite that does not clear the same bar
+ *      is rejected like any other candidate.
+ *   3. failing that, whichever candidate is LEAST similar — unless even that restates the source
+ *      (> hardMax), in which case NO card is produced and the post goes out as text.
+ *
+ * @param {string} post
+ * @param {{sourceHeadline?: string, rephrase?: ((line:string)=>Promise<string>)|null, maxSim?: number}} opts
+ *   `rephrase` is injected so this module stays pure and offline-testable; 10c-post.js supplies the
+ *   real LLM-backed one.
+ * @returns {Promise<{line: string, via: "original"|"rephrased"|"least-similar", similarity: number}>}
+ */
+export async function pickCardLine(post, { sourceHeadline = "", rephrase = null, maxSim = 0.6, hardMax = 0.8 } = {}) {
+  const candidates = candidateLines(post);
+  if (!candidates.length) return { line: pullQuote(post), via: "original", similarity: 0 };
+  if (!sourceHeadline) return { line: candidates[0], via: "original", similarity: 0 };
+
+  const scored = candidates.map((s) => ({ s, sim: similarity(s, sourceHeadline) }));
+
+  const clean = scored.find((c) => c.sim <= maxSim);
+  if (clean) return { line: clean.s, via: "original", similarity: Number(clean.sim.toFixed(2)) };
+
+  if (typeof rephrase === "function") {
+    try {
+      const out = String(await rephrase(scored[0].s) || "").trim().replace(/^["“]|["”]$/g, "");
+      const sim = similarity(out, sourceHeadline);
+      if (out && out.length >= 30 && out.length <= 190 && sim <= maxSim) {
+        return { line: out, via: "rephrased", similarity: Number(sim.toFixed(2)) };
+      }
+      console.log(`card: rephrase rejected (similarity ${sim.toFixed(2)} > ${maxSim}) — falling back`);
+    } catch (e) {
+      console.log("card: rephrase failed —", e.message);
+    }
   }
-  // Favour a line that makes a claim over one that merely sets the scene: prefer sentences that
-  // are not questions and sit in the meatier middle of the length range.
-  const scored = sentences.map((s, i) => ({
-    s,
-    score: (s.endsWith("?") ? -20 : 0) + (i === 0 ? 6 : 0) + Math.min(s.length, 130) / 10,
-  }));
-  scored.sort((a, b) => b.score - a.score);
-  return scored[0].s;
+
+  // Last resort: the least similar line. But if even THAT is essentially the source headline,
+  // return nothing and let the caller post text-only. A missing card costs a little reach; a card
+  // that puts someone else's headline in 70px type under your name costs your credibility.
+  const least = scored.reduce((a, b) => (b.sim < a.sim ? b : a));
+  if (least.sim > hardMax) {
+    console.log(`card: SKIPPED — every candidate restates the source (best ${least.sim.toFixed(2)} > ${hardMax})`);
+    return { line: null, via: "blocked", similarity: Number(least.sim.toFixed(2)) };
+  }
+  return { line: least.s, via: "least-similar", similarity: Number(least.sim.toFixed(2)) };
 }
 
 /**

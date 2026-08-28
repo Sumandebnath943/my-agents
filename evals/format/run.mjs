@@ -7,13 +7,14 @@
 // lists, and two separate lists that merely sit in the same post.
 import "../_env.mjs";
 import { runCases, isMain } from "../_lib.mjs";
-import { normalizeListMarkers, withSignature } from "../../agents/10-linkedin/format.js";
+import { normalizeListMarkers, withSignature, withCredit } from "../../agents/10-linkedin/format.js";
+import { similarity, pickCardLine, candidateLines } from "../../agents/10-linkedin/card.js";
 import { pullQuote, wrapText, fitText, cardSvg } from "../../agents/10-linkedin/card.js";
 import { PROFILE } from "../../lib/profile.js";
 
 const K = (d) => `${d}️⃣`;
 
-export function run() {
+export async function run() {   // async: the card-line checks await pickCardLine
   const fixCases = [
     {
       id: "the real bug: 1️⃣ then plain 2. 3.",
@@ -141,10 +142,84 @@ export function run() {
   ];
   const layout = runCases("card · layout + escaping", layoutCases, (c) => ({ ok: c.check() }));
 
-  return [fixes, left, groups, sigs, quotes, layout];
+  const creditCases = [
+    { id: "appends the credit", check: () => withCredit("Body text", "VentureBeat") === "Body text\n\nVia VentureBeat" },
+    { id: "idempotent — never credits twice", check: () => withCredit("Body\n\nVia VentureBeat", "VentureBeat") === "Body\n\nVia VentureBeat" },
+    { id: "unknown source is a no-op", check: () => withCredit("Body", "unknown") === "Body" },
+    { id: "empty source is a no-op", check: () => withCredit("Body", "") === "Body" },
+    { id: "null source is a no-op", check: () => withCredit("Body", null) === "Body" },
+    { id: "empty body stays empty", check: () => withCredit("", "VentureBeat") === "" },
+    { id: "a regex-special source name is escaped, not interpreted", check: () => withCredit("Body", "A.B (C)") === "Body\n\nVia A.B (C)" },
+    { id: "credit then signature reads in the right order", check: () => {
+      const out = withSignature(withCredit("Body", "The Verge"), "🤖 Drafted by MIGI");
+      return out.indexOf("Via The Verge") < out.indexOf("MIGI") && out.startsWith("Body");
+    } },
+  ];
+  const credits = runCases("format · source credit", creditCases, (c) => ({ ok: c.check() }));
+
+  // THE REAL INCIDENT: a card shipped carrying 92% of VentureBeat's headline in 70px type under
+  // Suman's name. These lock the gate that prevents it — including the subtle trap that a mere
+  // REWORD is not a fix ("act on their own" -> "act autonomously" is still the same headline).
+  const VB_HEADLINE = "When agents act on their own, governance has to live in the data layer";
+  const RESTATEMENT = "When agents act autonomously, governance has to live in the data layer.";
+  const REAL_POST = [
+    RESTATEMENT,
+    "As AI systems gain independence, the real question becomes how we make sure they act responsibly.",
+    "Governance can't be an afterthought; embed enforceable rules directly where data is read or written.",
+    "In my work with AI-native products, I've seen how this data-layer approach kept the IMPRINT engine compliant.",
+    "The future of AI isn't just about what agents can do—it's about how we control what they do.",
+  ].join("\n\n");
+
+  const simCases = [
+    { id: "a reworded headline scores HIGH", check: () => similarity(RESTATEMENT, VB_HEADLINE) > 0.8 },
+    { id: "an independent line scores LOW", check: () => similarity("The future of AI isn't just about what agents can do—it's about how we control what they do.", VB_HEADLINE) < 0.4 },
+    { id: "identical strings score 1", check: () => similarity(VB_HEADLINE, VB_HEADLINE) === 1 },
+    { id: "unrelated strings score 0", check: () => similarity("Rain fell on the quiet harbour town", VB_HEADLINE) === 0 },
+    { id: "a headline swallowed by a longer line still scores high", check: () => similarity(`Honestly, ${VB_HEADLINE}, and that changes everything for builders.`, VB_HEADLINE) > 0.8 },
+    { id: "empty input is safe", check: () => similarity("", VB_HEADLINE) === 0 },
+  ];
+  const sims = runCases("card · source similarity", simCases, (c) => ({ ok: c.check() }));
+
+  const pickCases = [
+    { id: "the claim outranks the credential line", check: async () => candidateLines(REAL_POST)[0].startsWith("The future of AI") },
+    { id: "the headline restatement is NOT chosen", check: async () => (await pickCardLine(REAL_POST, { sourceHeadline: VB_HEADLINE })).line !== RESTATEMENT },
+    { id: "chosen line clears the bar", check: async () => (await pickCardLine(REAL_POST, { sourceHeadline: VB_HEADLINE })).similarity <= 0.6 },
+    { id: "no source headline -> best candidate, no gate", check: async () => (await pickCardLine(REAL_POST, {})).via === "original" },
+    { id: "a GENUINE rephrase is accepted", check: async () => {
+      const r = await pickCardLine(RESTATEMENT, { sourceHeadline: VB_HEADLINE, rephrase: async () => "Autonomy without control is just risk moving faster." });
+      return r.via === "rephrased" && r.line.startsWith("Autonomy");
+    } },
+    { id: "a mere REWORD is rejected, not trusted", check: async () => {
+      const r = await pickCardLine(RESTATEMENT, { sourceHeadline: VB_HEADLINE, rephrase: async () => "When agents act on their own, governance must live in the data layer." });
+      return r.via !== "rephrased";
+    } },
+    { id: "when nothing clears the bar, NO card is made", check: async () => (await pickCardLine(RESTATEMENT, { sourceHeadline: VB_HEADLINE })).line === null },
+    { id: "a throwing rephraser degrades safely", check: async () => {
+      const r = await pickCardLine(RESTATEMENT, { sourceHeadline: VB_HEADLINE, rephrase: async () => { throw new Error("llm down"); } });
+      return r.line === null && r.via === "blocked";
+    } },
+  ];
+  const picks = await runCasesAsync("card · never restates the source", pickCases);
+
+  return [fixes, left, groups, sigs, quotes, layout, credits, sims, picks];
+}
+
+/** runCases is sync; these checks are async, so mirror its shape and reporting. */
+async function runCasesAsync(label, cases) {
+  let pass = 0, fail = 0;
+  const fails = [];
+  console.log(`\n▶ ${label}`);
+  for (const c of cases) {
+    let ok = false, note = "";
+    try { ok = !!(await c.check()); } catch (e) { note = `threw: ${e.message}`; }
+    if (ok) { pass++; console.log(`  ✓ ${c.id}`); }
+    else { fail++; fails.push({ id: c.id, note }); console.log(`  ✗ ${c.id} ${note}`); }
+  }
+  console.log(`  ${pass}/${cases.length} passed — ${fail ? `${fail} FAILED` : "all green"}`);
+  return { label, pass, fail, fails };
 }
 
 if (isMain(import.meta.url)) {
-  const results = run();
+  const results = await run();
   if (results.some((r) => r.fail)) process.exit(1);
 }

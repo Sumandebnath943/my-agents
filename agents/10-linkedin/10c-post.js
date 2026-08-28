@@ -62,11 +62,26 @@ const commentary = (escapeLI(cleanPost) + (row.hashtags ? `\n\n${row.hashtags}` 
 // through to a text-only post — an image problem must never cost you the post itself.
 // Upload permission was verified against the live API (scripts/linkedin-image-spike.mjs).
 let mediaId = null;
+let cardAlt = null;   // the card's OWN line — never the source headline, which is the thing being avoided
 if (process.env.LINKEDIN_POST_IMAGE === "1") {
   try {
-    const { renderCard, pullQuote } = await import("./card.js");
-    const quote = pullQuote(cleanPost);
-    const png = renderCard({ quote });
+    const { renderCard, pickCardLine } = await import("./card.js");
+    const { callLLM } = await import("../../lib/llm.js");
+
+    // The card must never restate the source headline. On 2026-08-28 a card shipped carrying 92%
+    // of VentureBeat's headline in 70px type under Suman's name — legal or not, that reads as
+    // passing off. pickCardLine walks past any candidate too close to the source, and only then
+    // tries a rephrase, which is VERIFIED against the same bar rather than trusted.
+    const rephrase = async (line) => callLLM([
+      { role: "system", content: "Rewrite the sentence so it expresses the same idea in completely different words. Change the sentence structure and vocabulary, not just a word or two. Keep it under 150 characters, declarative, no quotes, no hashtags. Reply with the rewritten sentence and nothing else." },
+      { role: "user", content: `Rewrite this, avoiding the phrasing of this headline: "${row.headline || ""}"\n\nSentence: ${line}` },
+    ]);
+
+    const picked = await pickCardLine(cleanPost, { sourceHeadline: row.headline || "", rephrase });
+    if (!picked.line) throw new Error(`no card line clears the source-similarity bar (best ${picked.similarity})`);
+    console.log(`card: line via ${picked.via} (similarity to source ${picked.similarity})`);
+
+    const png = renderCard({ quote: picked.line });
     if (!png) throw new Error("card renderer returned nothing");
 
     const initRes = await fetch("https://api.linkedin.com/rest/images?action=initializeUpload", {
@@ -86,7 +101,8 @@ if (process.env.LINKEDIN_POST_IMAGE === "1") {
     if (!put.ok) throw new Error(`image upload ${put.status}`);
 
     mediaId = init.image;
-    console.log(`card: attached ${png.length} bytes as ${mediaId} — quote: "${quote.slice(0, 70)}"`);
+    cardAlt = picked.line;
+    console.log(`card: attached ${png.length} bytes as ${mediaId} — "${picked.line.slice(0, 70)}"`);
   } catch (e) {
     console.error(`card: SKIPPED, posting text-only — ${e.message}`);
     mediaId = null;
@@ -108,7 +124,7 @@ const res = await fetch("https://api.linkedin.com/rest/posts", {
     distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] },
     lifecycleState: "PUBLISHED",
     isReshareDisabledByAuthor: false,
-    ...(mediaId ? { content: { media: { id: mediaId, altText: (row.headline || "Insight card").slice(0, 300) } } } : {}),
+    ...(mediaId ? { content: { media: { id: mediaId, altText: (cardAlt || "Insight card").slice(0, 300) } } } : {}),
   }),
 });
 
