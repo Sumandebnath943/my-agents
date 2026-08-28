@@ -56,6 +56,43 @@ const escapeLI = (s) => s.replace(/[\\<>~_*#@|(){}\[\]]/g, (c) => `\\${c}`);
 // backslash-escaped and render as text). Hashtags are appended separately (kept clickable).
 const cleanPost = stripMarkdown(row.post);
 const commentary = (escapeLI(cleanPost) + (row.hashtags ? `\n\n${row.hashtags}` : "")).trim();
+// ---- Optional insight card -----------------------------------------------------------------
+// OFF BY DEFAULT: set LINKEDIN_POST_IMAGE=1 to attach one. Publishing is irreversible, so this
+// stays opt-in until the card has been eyeballed on a real post. Every failure path below falls
+// through to a text-only post — an image problem must never cost you the post itself.
+// Upload permission was verified against the live API (scripts/linkedin-image-spike.mjs).
+let mediaId = null;
+if (process.env.LINKEDIN_POST_IMAGE === "1") {
+  try {
+    const { renderCard, pullQuote } = await import("./card.js");
+    const quote = pullQuote(cleanPost);
+    const png = renderCard({ quote });
+    if (!png) throw new Error("card renderer returned nothing");
+
+    const initRes = await fetch("https://api.linkedin.com/rest/images?action=initializeUpload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json", "LinkedIn-Version": LINKEDIN_API_VERSION, "X-Restli-Protocol-Version": "2.0.0" },
+      body: JSON.stringify({ initializeUploadRequest: { owner: token.person_urn } }),
+    });
+    if (!initRes.ok) throw new Error(`initializeUpload ${initRes.status}: ${(await initRes.text()).slice(0, 160)}`);
+    const init = (await initRes.json())?.value;
+    if (!init?.uploadUrl || !init?.image) throw new Error("initializeUpload returned no uploadUrl/image");
+
+    const put = await fetch(init.uploadUrl, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${access}`, "Content-Type": "image/png" },
+      body: png,
+    });
+    if (!put.ok) throw new Error(`image upload ${put.status}`);
+
+    mediaId = init.image;
+    console.log(`card: attached ${png.length} bytes as ${mediaId} — quote: "${quote.slice(0, 70)}"`);
+  } catch (e) {
+    console.error(`card: SKIPPED, posting text-only — ${e.message}`);
+    mediaId = null;
+  }
+}
+
 const res = await fetch("https://api.linkedin.com/rest/posts", {
   method: "POST",
   headers: {
@@ -71,6 +108,7 @@ const res = await fetch("https://api.linkedin.com/rest/posts", {
     distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] },
     lifecycleState: "PUBLISHED",
     isReshareDisabledByAuthor: false,
+    ...(mediaId ? { content: { media: { id: mediaId, altText: (row.headline || "Insight card").slice(0, 300) } } } : {}),
   }),
 });
 

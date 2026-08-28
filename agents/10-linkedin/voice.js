@@ -39,7 +39,10 @@ VOICE & CHARACTER:
 
 FORMAT LIMITS:
 - ~150–280 words (a great story or framework may run to ~340). Long enough to deliver value, tight enough to keep every line earning its place.
-- At most 1 emoji, used as a marker (e.g. a list glyph), never as decoration. When unsure, use zero.
+- At most 1 DECORATIVE emoji in the whole post, and zero is usually better. Never as punctuation or filler.
+- Numbered-list markers are NOT decoration and do NOT count against that budget — but a list must
+  pick ONE style and keep it for every item. Either every item is 1. 2. 3. or every item is 1️⃣ 2️⃣ 3️⃣.
+  Never start with 1️⃣ and continue with 2. — and never number the first item and leave the rest bare.
 - Prefer clean line breaks and → / • over walls of text. No markdown bold/italics (LinkedIn renders it literally).`;
 
 // A compact reminder of the value-per-post bar, injected near the instruction so the model

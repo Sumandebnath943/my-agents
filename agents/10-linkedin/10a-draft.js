@@ -16,6 +16,11 @@ import { PROFILE, profileContext } from "../../lib/profile.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { AI_FEEDS, SCRAPE_BLOCKED } from "./sources.js";
 import { scrapeClean } from "../../lib/scrape.js";
+import { normalizeListMarkers, withSignature } from "./format.js";
+
+// Signature appended to every published post. Set LINKEDIN_SIGNATURE="" to switch it off entirely
+// without touching code; applied idempotently so regenerates never stack it.
+const POST_SIGNATURE = process.env.LINKEDIN_SIGNATURE ?? "🤖 Drafted by MIGI, my AI agent — edited and published by me.";
 import { WRITING_PLAYBOOK, VALUE_BAR } from "./voice.js";
 import { referenceBlock } from "./references.js";
 import { rankWinners, winnersBlock, winnersStatus } from "./winners.js";
@@ -326,6 +331,10 @@ CRITICAL — PRESERVE FORMATTING: keep the exact line-break cadence and blank-li
 Voice bar: ${VALUE_BAR}`,
   });
   o.post = stripMarkdown(crit.text); // re-strip in case the critic reintroduced any markdown
+  // Deterministic clean-up AFTER the critic, which can itself reintroduce ragged numbering. The
+  // playbook asks for consistent list markers; this guarantees it. Then sign, idempotently, so a
+  // regenerate or an edit can never stack two signatures.
+  o.post = withSignature(normalizeListMarkers(o.post), POST_SIGNATURE);
 
   const hashtags = (await trendingHashtags(item.headline || "AI", { platform: "linkedin", count: 3 })).join(" ");
   const review = await safetyReview(o.post);
@@ -369,6 +378,9 @@ Return ONLY JSON {"post":"revised post text, formatted with real line breaks"}.`
     { json: true }
   );
   let revised = row.post; try { revised = stripMarkdown(parseJson(out).post || row.post); } catch {}
+  // Same treatment as a fresh draft: an edit can just as easily produce a ragged list, and
+  // withSignature is idempotent so re-signing an already-signed post is a no-op.
+  revised = withSignature(normalizeListMarkers(revised), POST_SIGNATURE);
   const review = await safetyReview(revised);
   if (review.hard) { await notifyTelegram(`🛑 Revised draft blocked by the safety filter (${review.reasons.join(", ")}). Not sent.`, { html: true }); process.exit(0); }
   const warning = review.safe ? null : review.reasons.join("; ");
@@ -419,6 +431,24 @@ if (process.env.NEWS_IDX) {
 }
 
 // ---------------- CURATE mode (default) ----------------
+// Publisher label for a link, so every pick says where it came from. Hand-mapped for the outlets
+// whose hostname doesn't read as a name; everything else falls back to the bare domain.
+const SOURCE_NAMES = {
+  "theverge.com": "The Verge", "venturebeat.com": "VentureBeat", "arstechnica.com": "Ars Technica",
+  "technologyreview.com": "MIT Tech Review", "techcrunch.com": "TechCrunch", "openai.com": "OpenAI",
+  "deepmind.google": "Google DeepMind", "huggingface.co": "Hugging Face",
+  "simonwillison.net": "Simon Willison", "ycombinator.com": "Hacker News", "github.com": "GitHub",
+  "anthropic.com": "Anthropic", "nytimes.com": "NYT", "wired.com": "WIRED", "bloomberg.com": "Bloomberg",
+};
+function sourceName(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    if (SOURCE_NAMES[host]) return SOURCE_NAMES[host];
+    const reg = host.split(".").slice(-2).join(".");
+    return SOURCE_NAMES[reg] || host;
+  } catch { return "unknown"; }
+}
+
 async function readFeed(url) {
   try {
     const feed = await fetchXml(url);
@@ -427,19 +457,45 @@ async function readFeed(url) {
     // Keep the feed's own summary too. It costs nothing (already downloaded) and gives the
     // curator real substance to rank on instead of guessing from a headline. Publisher feeds vary
     // wildly here — The Verge gives ~680 chars, VentureBeat ~5k, several give none at all.
-    return arr.slice(0, 12).map((it) => ({
-      title: textOf(it.title),
-      link: linkHref(it.link),
-      summary: String(textOf(it.description ?? it.summary ?? it.content ?? "") || "")
-        .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 400),
-    }));
+    return arr.slice(0, 12).map((it) => {
+      const link = linkHref(it.link);
+      return {
+        title: textOf(it.title),
+        link,
+        source: sourceName(link),
+        summary: String(textOf(it.description ?? it.summary ?? it.content ?? "") || "")
+          .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 400),
+      };
+    });
   } catch { return []; }
 }
 
-const raw = (await Promise.all(AI_FEEDS.map(readFeed))).flat().filter((a) => a.title);
+const perFeed = await Promise.all(AI_FEEDS.map(readFeed));
+// FEED STARVATION FIX (2026-08-29). The old code flattened every feed into one list and took the
+// first 40. Feeds were therefore consumed in declaration order, and measured on the live feeds
+// that meant 5 of 10 NEVER reached the curator — including all three primary sources (OpenAI,
+// DeepMind, Hugging Face) and both practitioner sources (HN, Simon Willison). The curator only
+// ever saw four general-tech outlets, which is why the picks looked so samey.
+//
+// Round-robin instead: take the 1st item from every feed, then the 2nd from every feed, and so on.
+// Every source gets a seat at the table before any source gets a second one.
+function interleave(lists) {
+  const out = [];
+  const depth = Math.max(0, ...lists.map((l) => l.length));
+  for (let i = 0; i < depth; i++) for (const l of lists) if (l[i]) out.push(l[i]);
+  return out;
+}
+const raw = interleave(perFeed).filter((a) => a.title);
 const seen = new Set();
 const headlines = raw.filter((a) => { const k = a.title.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 40);
 if (!headlines.length) { console.log("No headlines fetched."); process.exit(0); }
+{
+  const bySrc = {};
+  for (const h of headlines) bySrc[h.source || "?"] = (bySrc[h.source || "?"] || 0) + 1;
+  const empty = perFeed.map((l, i) => (l.length ? null : AI_FEEDS[i])).filter(Boolean);
+  console.log(`headlines: ${headlines.length} from ${Object.keys(bySrc).length} sources —`, JSON.stringify(bySrc));
+  if (empty.length) console.log(`⚠️ feeds that returned NOTHING (check them):`, empty.join(", "));
+}
 
 const recents = await recentPosts();
 const curated = await geminiThenGroq(
@@ -449,8 +505,14 @@ Prefer substantive developments (new models, tools, agentic/AI-product shifts, n
 RECENTLY POSTED (avoid repeats):
 ${recentBlockOf(recents)}
 
+TOPIC SPREAD: the 7 picks must not all be the same story or the same theme. Agentic AI is ONE
+theme, not the whole field — at most 3 picks may be agent-centric. Deliberately include other
+substantive threads when the day offers them: new models and capabilities, research, chips and
+infrastructure, tooling and developer platforms, safety and regulation, and the business of AI.
+Prefer spreading across different PUBLISHERS too when quality is comparable.
+
 TODAY'S HEADLINES (choose by index):
-${headlines.map((h, i) => `${i}. ${h.title}${h.summary ? `\n   ${h.summary.slice(0, 240)}` : ""}`).join("\n")}
+${headlines.map((h, i) => `${i}. [${h.source || "?"}] ${h.title}${h.summary ? `\n   ${h.summary.slice(0, 240)}` : ""}`).join("\n")}
 
 Return ONLY JSON {"picks":[{"i":<index>,"why":"one short line: why it matters to my audience","angle":"one short line: an angle I could take, grounded in my work"}]} with 5-7 items, best first.`,
   { json: true }
@@ -462,10 +524,10 @@ picks = picks.filter((p) => headlines[p.i]).slice(0, 7);
 if (!picks.length) { console.log("Curate: nothing worth posting today."); process.exit(0); }
 
 const batchId = Date.now().toString(36);
-const items = picks.map((p) => ({ headline: headlines[p.i].title, link: headlines[p.i].link, summary: headlines[p.i].summary || "", why: p.why || "", angle: p.angle || "" }));
+const items = picks.map((p) => ({ headline: headlines[p.i].title, link: headlines[p.i].link, source: headlines[p.i].source || sourceName(headlines[p.i].link), summary: headlines[p.i].summary || "", why: p.why || "", angle: p.angle || "" }));
 await db.from("kv").upsert({ key: NEWS_BATCH_KEY, value: { id: batchId, created_at: new Date().toISOString(), items }, updated_at: new Date().toISOString() });
 
-const list = items.map((it, i) => `<b>${i + 1}.</b> ${tgEscape(it.headline)}\n   ↳ <i>${tgEscape(it.why)}</i>`).join("\n\n");
+const list = items.map((it, i) => `<b>${i + 1}.</b> ${tgEscape(it.headline)}\n   <i>${tgEscape(it.source || "unknown")}</i> · ${tgEscape(it.why)}`).join("\n\n");
 const numberButtons = items.map((it, i) => ({ text: String(i + 1), callback_data: `li:news:${batchId}:${i}` }));
 const rows = [];
 for (let i = 0; i < numberButtons.length; i += 4) rows.push(numberButtons.slice(i, i + 4));

@@ -13,6 +13,7 @@ import { run as llmRouting } from "./llm-routing/run.mjs";
 import { run as skillgap } from "./skillgap/run.mjs";
 import { run as review } from "./review/run.mjs";
 import { run as engagement } from "./engagement/run.mjs";
+import { run as format } from "./format/run.mjs";
 import { run as integrity } from "./integrity/run.mjs";
 import { run as winners } from "./winners/run.mjs";
 import { run as reconcile } from "./reconcile/run.mjs";
@@ -23,7 +24,7 @@ import { run as jobApply } from "./job-apply/run.mjs";
 import { run as jobFeedback } from "./job-feedback/run.mjs";
 import { run as jobDedupe } from "./job-dedupe/run.mjs";
 
-const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, integrity, winners, reconcile, calendar, health, jobFilter, jobApply, jobFeedback, jobDedupe];
+const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, format, integrity, winners, reconcile, calendar, health, jobFilter, jobApply, jobFeedback, jobDedupe];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];
