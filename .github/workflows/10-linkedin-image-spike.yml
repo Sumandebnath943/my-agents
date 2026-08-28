@@ -1,0 +1,29 @@
+# .github/workflows/10-linkedin-image-spike.yml
+# MANUAL ONLY — no schedule, so this adds zero scheduled events to a fleet GitHub is already
+# throttling. Answers one question: does LinkedIn accept an image upload on w_member_social?
+# PUBLISHES NOTHING — it stops before the step that would create a post.
+name: LinkedIn · Image Upload Spike
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: 10-linkedin-image-spike-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node scripts/linkedin-image-spike.mjs
+        env:
+          AGENT_NAME: linkedin
+          TOKEN_ENC_KEY: ${{ secrets.TOKEN_ENC_KEY }}
+          LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
+          LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
