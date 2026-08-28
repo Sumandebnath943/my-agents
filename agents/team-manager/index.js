@@ -5,7 +5,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callLLM } from "../../lib/llm.js";
-import { notifyEmail } from "../../lib/notify.js";
+import { notifyEmail, notifyTelegram } from "../../lib/notify.js";
+import { actionsUsage, usageLine } from "../../lib/actions-usage.js";
 import { renderEmail, mdToHtml } from "../../lib/email-template.js";
 
 const db = createClient(env("SUPABASE_URL"), env("SUPABASE_KEY"));
@@ -59,6 +60,10 @@ const opsNote = opsSummary.email_failures || opsSummary.rate_limit_warnings
   ? `⚠️ ${opsSummary.email_failures} email failure(s) · ${opsSummary.rate_limit_warnings} rate-limit warning(s)${opsSummary.agents_hitting_limits.length ? ` (${opsSummary.agents_hitting_limits.join(", ")})` : ""}`
   : "No ops incidents this week. ✅";
 
+// Actions compute for the month. Best-effort: a billing failure yields a printed reason, never
+// a thrown error and never a silent zero.
+const usage = await actionsUsage();
+
 await notifyEmail("🛠️ Team Manager — weekly fleet report", renderEmail({
   title: "Team Manager — fleet report", kicker: "WEEKLY LLM OPS", accent: "#BA7517",
   blocks: [
@@ -72,7 +77,21 @@ await notifyEmail("🛠️ Team Manager — weekly fleet report", renderEmail({
     { type: "stat", text: opsNote },
     { type: "listSection", ramp: "blue", heading: "BY PROVIDER", items: provItems },
     { type: "listSection", ramp: "amber", heading: "BY AGENT", items: agentItems },
+    { type: "stat", text: usageLine(usage) },
   ],
-  footer: "Team Manager · llm_metrics, last 7 days",
+  footer: "Team Manager · llm_metrics, last 7 days · Actions minutes from GitHub billing",
 }));
+
+// Telegram gets the compute line only — the narrative already goes out by email, and the point of
+// the push is the one number worth glancing at: how much runner time the fleet burned this month.
+// Non-fatal by design: the email has ALREADY been sent by this point, and notifyTelegram's env()
+// throws on a missing TELEGRAM_* secret — an unwrapped throw here would mark the whole weekly
+// report as failed even though its main output landed.
+try {
+  await notifyTelegram(usageLine(usage));
+} catch (e) {
+  console.error("team-manager: Telegram push failed (email still sent) —", e.message);
+}
+
+console.log(usageLine(usage));
 console.log(narrative);

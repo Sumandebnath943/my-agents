@@ -29,15 +29,43 @@ const thisWeek = posts.filter((p) => p.created_at >= weekAgo);
 const { data: tk } = await db.from("kv").select("value").eq("key", "linkedin:token").maybeSingle();
 const token = openValue(tk?.value);
 
+// WHY ENGAGEMENT IS (ALMOST CERTAINLY) EMPTY, and why that is not a bug:
+// this app's OAuth scope is `openid profile w_member_social` — WRITE-only. Reading likes and
+// comments needs partner-tier access LinkedIn does not grant ordinary apps, so socialActions
+// answers 403 for every post. Permanent platform limit, not a fault.
+//
+// The trap this replaces: the old code did `if (!r.ok) return null`, throwing the status away.
+// A permanent 403 and an EXPIRED TOKEN (401) then produced the identical sentence in the email,
+// so a real breakage was indistinguishable from the known limitation. Tally the reasons instead
+// and say which one it was — once, at the bottom, rather than on every post.
+const blockers = new Map();
+const note = (k) => blockers.set(k, (blockers.get(k) || 0) + 1);
+
 async function engagement(urn) {
-  if (!token?.access_token || !urn) return null;
+  if (!token?.access_token) { note("no-token"); return null; }
+  if (!urn) { note("no-urn"); return null; }
   try {
     const r = await fetch(`https://api.linkedin.com/rest/socialActions/${encodeURIComponent(urn)}`, {
       headers: { Authorization: `Bearer ${token.access_token}`, "LinkedIn-Version": LINKEDIN_API_VERSION, "X-Restli-Protocol-Version": "2.0.0" },
     });
-    if (!r.ok) return null;
+    if (!r.ok) { note(String(r.status)); return null; }
     return parseEngagement(await r.json());
-  } catch { return null; }
+  } catch { note("network"); return null; }
+}
+
+// The single most common blocker, phrased for a human. Returns null when nothing was blocked.
+function blockerExplanation() {
+  if (!blockers.size) return null;
+  const [top, n] = [...blockers.entries()].sort((a, b) => b[1] - a[1])[0];
+  const suffix = ` (${n} post${n > 1 ? "s" : ""})`;
+  if (top === "403") return `ℹ️ Likes/comments aren't shown because LinkedIn only shares them with partner-tier apps. This app can post, but not read engagement — a permanent LinkedIn limit, not a fault.${suffix}`;
+  if (top === "401") return `⚠️ Your LinkedIn sign-in has EXPIRED — reconnect LinkedIn on the dashboard to resume posting and engagement reads.${suffix}`;
+  if (top === "404") return `⚠️ LinkedIn couldn't find these posts (404) — the stored post links may be malformed.${suffix}`;
+  if (top === "429") return `⚠️ LinkedIn rate-limited the engagement reads (429) — it should recover on its own.${suffix}`;
+  if (top === "no-token") return `⚠️ No LinkedIn account is connected — connect it on the dashboard.${suffix}`;
+  if (top === "no-urn") return `⚠️ Some posts have no usable LinkedIn link stored, so engagement can't be looked up.${suffix}`;
+  if (top === "network") return `⚠️ Couldn't reach LinkedIn to read engagement.${suffix}`;
+  return `ℹ️ LinkedIn returned ${top} for the engagement lookup.${suffix}`;
 }
 
 // Sample every post in the window once, keyed by id so the email can reuse the same reading.
@@ -62,6 +90,8 @@ if (storable.length) {
 } else {
   console.log(`linkedin engagement: nothing to save (${posts.length} post(s) in window, none returned usable counts).`);
 }
+// Always print WHY, so a permanent 403 never again looks the same as an expired token in the logs.
+if (blockers.size) console.log("linkedin engagement blockers:", JSON.stringify(Object.fromEntries(blockers)));
 
 // A quiet week still reports honestly, and still banks the samples above.
 if (!thisWeek.length) {
@@ -79,13 +109,16 @@ for (const p of thisWeek) {
   const eng = byId.get(p.id);
   items.push({
     title: p.headline || "LinkedIn post",
-    note: eng ? `👍 ${eng.likes ?? "?"} likes · 💬 ${eng.comments ?? "?"} comments` : "engagement not exposed by LinkedIn's API for this post",
+    note: eng ? `👍 ${eng.likes ?? "?"} likes · 💬 ${eng.comments ?? "?"} comments` : "likes/comments unavailable — see note below",
     link: p.post_url || undefined,
     buttonLabel: p.post_url ? "View" : undefined,
   });
 }
 
 const blocks = [{ type: "listSection", ramp: "blue", heading: `${thisWeek.length} POST${thisWeek.length > 1 ? "S" : ""} PUBLISHED`, items }];
+// Explain the missing numbers ONCE, and say which cause it actually was.
+const why = blockerExplanation();
+if (why) blocks.push({ type: "stat", text: why });
 if (saveError) blocks.push({ type: "stat", text: `⚠️ Engagement history not saved — ${saveError.slice(0, 120)}` });
 
 const html = renderEmail({
