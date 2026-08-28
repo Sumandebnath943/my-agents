@@ -1,0 +1,37 @@
+# .github/workflows/10-social-image-spike.yml
+# MANUAL ONLY — no schedule, so this adds zero scheduled events to a throttled fleet.
+# Proves the insight card is accepted by Bluesky and Mastodon. PUBLISHES NOTHING: both platforms
+# take media in a separate call from creating the post, and this stops after the media call.
+name: Social · Card Upload Spike
+on:
+  workflow_dispatch:
+    inputs:
+      post_id:
+        description: "LinkedIn post id whose archived card to test (default 78)"
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: 10-social-image-spike-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm ci
+      - run: node scripts/social-image-spike.mjs
+        env:
+          AGENT_NAME: linkedin
+          CARD_POST_ID: ${{ github.event.inputs.post_id }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+          # Mastodon lives in the DASHBOARD's Vercel env, not here. If these repo secrets are
+          # absent the script reports SKIPPED rather than failing — that is information, not a bug.
+          MASTODON_INSTANCE: ${{ secrets.MASTODON_INSTANCE }}
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
