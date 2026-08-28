@@ -38,6 +38,14 @@ const esc = (s) => String(s ?? "")
 const AVG_ADVANCE = 0.54;
 const widthOf = (text, size) => text.length * size * AVG_ADVANCE;
 
+/** Trim a single line to a pixel budget, ellipsising only if it actually overflows. */
+export function clampToWidth(text, size, maxWidth) {
+  const s = String(text ?? "");
+  if (!s || widthOf(s, size) <= maxWidth) return s;
+  const max = Math.max(1, Math.floor(maxWidth / (size * AVG_ADVANCE)) - 1);
+  return `${s.slice(0, max).replace(/[\s,;:.]+$/, "")}…`;
+}
+
 /** Greedy word wrap to a pixel budget. Long unbreakable tokens get their own line. */
 export function wrapText(text, size, maxWidth) {
   const words = String(text || "").split(/\s+/).filter(Boolean);
@@ -314,6 +322,21 @@ export function cardSvg({
   const lineH = size * 1.28;
   const startY = TOP + size * 0.82;   // first baseline; the block grows downward from here
 
+  // Credit block geometry — measured so the mark can never be overprinted by the text beside it.
+  // widthOf errs slightly WIDE, which is the safe direction here: it buys clearance rather than
+  // eating into it. The bold watermark gets a small extra allowance on top.
+  const creditWmSize = 22, creditDcSize = 17, creditMark = 52, creditGap = 18;
+  // Floor the mark at the card's midpoint so a long descriptor can never march into the author's
+  // name opposite. That floor caps how much room the text has, so CLAMP the text to it — pushing
+  // the mark left is the first defence, trimming the text is the second. Without the clamp an
+  // over-long descriptor simply overlapped the mark once the floor was reached.
+  const creditFloor = S * 0.46;
+  const creditBudget = (S - pad) - (creditFloor + creditMark + creditGap);
+  const wm = clampToWidth(watermark, creditWmSize * 1.06, creditBudget);
+  const dc = clampToWidth(descriptor, creditDcSize, creditBudget);
+  const creditW = Math.max(widthOf(wm, creditWmSize) * 1.06, widthOf(dc, creditDcSize));
+  const creditMarkX = Math.max(creditFloor, S - pad - creditW - creditGap - creditMark);
+
   const quoteLines = lines
     .map((l, i) => `<text x="${pad}" y="${(startY + i * lineH).toFixed(1)}" font-size="${size}" font-weight="700" fill="${BRAND.ink}" font-family="${BRAND.font}">${esc(l)}</text>`)
     .join("\n    ");
@@ -337,12 +360,15 @@ export function cardSvg({
   <text x="${pad}" y="${S - 150}" font-size="34" font-weight="700" fill="${BRAND.ink}" font-family="${BRAND.font}">${esc(author)}</text>
   <text x="${pad}" y="${S - 108}" font-size="25" fill="${BRAND.muted}" font-family="${BRAND.font}">${esc(handle)}</text>
 
-  <!-- MIGI mark + credit, bottom-right. Text is right-aligned to the padding edge so a longer
-       descriptor can never collide with the author block on the left. -->
+  <!-- MIGI mark + credit, bottom-right.
+       The mark's x is MEASURED, not fixed. It used to sit at a hard-coded offset while the text
+       was right-aligned to the padding edge, so "Suman's autonomous AI agent" grew leftward and
+       printed straight over the logo. Measure the wider of the two lines, then place the mark
+       clear of it. Any future watermark or descriptor now positions itself correctly. -->
   <g transform="translate(0, ${S - 182})">
-    ${migiMark(S - pad - 300, 2, 52)}
-    <text x="${S - pad}" y="26" font-size="22" font-weight="700" fill="${BRAND.ink}" font-family="${BRAND.font}" text-anchor="end">${esc(watermark)}</text>
-    <text x="${S - pad}" y="50" font-size="17" fill="${BRAND.muted}" font-family="${BRAND.font}" text-anchor="end">${esc(descriptor)}</text>
+    ${migiMark(creditMarkX, 2, creditMark)}
+    <text x="${S - pad}" y="26" font-size="${creditWmSize}" font-weight="700" fill="${BRAND.ink}" font-family="${BRAND.font}" text-anchor="end">${esc(wm)}</text>
+    <text x="${S - pad}" y="50" font-size="${creditDcSize}" fill="${BRAND.muted}" font-family="${BRAND.font}" text-anchor="end">${esc(dc)}</text>
   </g>
 </svg>`;
 }

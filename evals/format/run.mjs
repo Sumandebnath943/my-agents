@@ -141,6 +141,25 @@ export async function run() {   // async: the card-line checks await pickCardLin
     { id: "footer uses the real portfolio domain", check: () => cardSvg({ quote: "hi" }).includes(PROFILE.site) },
     { id: "the real domain is houseofnamus, not a bare apex", check: () => /^sumandebnath\.houseofnamus\.com$/.test(PROFILE.site) },
     { id: "no invented apex domain anywhere on the card", check: () => !/[^.]sumandebnath\.com/.test(cardSvg({ quote: "hi" })) },
+    // The credit text is right-aligned while the MIGI mark sat at a FIXED x, so a longer
+    // descriptor grew leftward and printed straight over the logo. The mark's position is now
+    // measured from the text width; these assert the two never touch, at any length.
+    { id: "the MIGI mark never collides with the credit text", check: () => {
+      const AVG = 0.54, PAD = 96, S = 1200;
+      const unesc = (s) => s.replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+      for (const d of ["AI agent", "Suman's autonomous AI agent", "an absurdly long descriptor nobody would ever reasonably choose to use"]) {
+        const svg = cardSvg({ quote: "test", descriptor: d });
+        const circles = [...svg.matchAll(/<circle cx="([0-9.]+)" cy="[0-9.]+" r="([0-9.]+)" fill="#C6F24E"\/>/g)];
+        const last = circles[circles.length - 1];                    // the credit mark
+        const markRight = Number(last[1]) + Number(last[2]);
+        const texts = [...svg.matchAll(/<text x="1104"[^>]*font-size="(22|17)"[^>]*>([^<]*)<\/text>/g)]
+          .map((t) => unesc(t[2]).length * Number(t[1]) * AVG * (t[1] === "22" ? 1.06 : 1));
+        if ((S - PAD - Math.max(...texts)) < markRight) return false;
+      }
+      return true;
+    } },
+    { id: "an over-long descriptor is ellipsised, not overlapped", check: () => cardSvg({ quote: "t", descriptor: "an absurdly long descriptor nobody would ever reasonably choose to use" }).includes("…") },
+    { id: "a normal descriptor is never truncated", check: () => cardSvg({ quote: "t" }).includes("autonomous AI agent</text>") },
     // Backdrop: must vary between posts but stay reproducible, and must never be loud enough to
     // fight the quote. An opacity above ~0.12 on a background layer would start doing that.
     { id: "same quote renders an identical card", check: () => cardSvg({ quote: "the same line twice" }) === cardSvg({ quote: "the same line twice" }) },
