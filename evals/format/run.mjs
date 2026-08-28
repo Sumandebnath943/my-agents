@@ -9,6 +9,7 @@ import "../_env.mjs";
 import { runCases, isMain } from "../_lib.mjs";
 import { normalizeListMarkers, withSignature } from "../../agents/10-linkedin/format.js";
 import { pullQuote, wrapText, fitText, cardSvg } from "../../agents/10-linkedin/card.js";
+import { PROFILE } from "../../lib/profile.js";
 
 const K = (d) => `${d}️⃣`;
 
@@ -117,6 +118,11 @@ export function run() {
       return (visible.match(/MIGI/g) || []).length === 1;
     } },
     { id: "a custom watermark is honoured", check: () => cardSvg({ quote: "hi", watermark: "Made by" }).includes(">Made by<") },
+    // A card once shipped showing an invented "sumandebnath.com". The footer must come from
+    // lib/profile.js and match the real portfolio host, which is houseofnamUS.
+    { id: "footer uses the real portfolio domain", check: () => cardSvg({ quote: "hi" }).includes(PROFILE.site) },
+    { id: "the real domain is houseofnamus, not a bare apex", check: () => /^sumandebnath\.houseofnamus\.com$/.test(PROFILE.site) },
+    { id: "no invented apex domain anywhere on the card", check: () => !/[^.]sumandebnath\.com/.test(cardSvg({ quote: "hi" })) },
   ];
   const layout = runCases("card · layout + escaping", layoutCases, (c) => ({ ok: c.check() }));
 

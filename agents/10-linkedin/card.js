@@ -14,6 +14,7 @@
 // (DejaVu Sans) and Windows (Segoe UI/Arial). Substitution changes the look slightly; it never
 // breaks the layout.
 import { Resvg } from "@resvg/resvg-js";
+import { PROFILE } from "../../lib/profile.js";
 
 export const CARD_SIZE = 1200;
 
@@ -96,8 +97,35 @@ export function pullQuote(post, { min = 40, max = 190 } = {}) {
   return scored[0].s;
 }
 
+/**
+ * The MIGI mark, drawn as vector rather than embedded as a bitmap: it stays sharp at any size,
+ * adds no base64 weight, and carries no white background to clash with the dark card.
+ * A lime disc with a dark half-moon bulging left — the flat edge sits on the disc's centre line.
+ */
+export function migiMark(x, y, size) {
+  const r = size / 2;
+  const cx = x + r, cy = y + r;
+  const mr = r * 0.79;                       // half-moon radius, measured off the source artwork
+  // Start at the top of the flat edge, sweep counter-clockwise to the bottom: bulges left.
+  const moon = `M ${cx} ${cy - mr} A ${mr} ${mr} 0 0 0 ${cx} ${cy + mr} Z`;
+  return `<g>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${BRAND.accent}"/>
+      <path d="${moon}" fill="${BRAND.bg}"/>
+    </g>`;
+}
+
 /** The card as an SVG string. Exported so the layout can be eyeballed without rasterising. */
-export function cardSvg({ quote, kicker = "AI, in practice", author = "Suman Debnath", handle = "sumandebnath.com", watermark = "Created by MIGI" }) {
+export function cardSvg({
+  quote,
+  kicker = "AI, in practice",
+  // Both come from lib/profile.js — never retyped here. An earlier version hardcoded a domain
+  // that does not exist, and it went onto a rendered card before anyone noticed.
+  author = PROFILE.name,
+  handle = PROFILE.site,
+  watermark = "Created by MIGI",
+  // Says what MIGI actually is, so the credit informs rather than just labelling.
+  descriptor = "Suman's autonomous AI agent",
+}) {
   const S = CARD_SIZE;
   const pad = 96;
   const boxW = S - pad * 2;
@@ -131,13 +159,12 @@ export function cardSvg({ quote, kicker = "AI, in practice", author = "Suman Deb
   <text x="${pad}" y="${S - 150}" font-size="34" font-weight="700" fill="${BRAND.ink}" font-family="${BRAND.font}">${esc(author)}</text>
   <text x="${pad}" y="${S - 108}" font-size="25" fill="${BRAND.muted}" font-family="${BRAND.font}">${esc(handle)}</text>
 
-  <!-- MIGI mark + watermark, bottom-right: attribution without shouting. Two lines, not three —
-       printing "MIGI" as both a title and inside the watermark read as a duplication. -->
-  <g transform="translate(${S - pad - 214}, ${S - 180})">
-    <rect x="0" y="0" width="54" height="54" rx="15" fill="${BRAND.accent}"/>
-    <text x="27" y="38" font-size="29" font-weight="700" fill="${BRAND.bg}" font-family="${BRAND.font}" text-anchor="middle">M</text>
-    <text x="72" y="24" font-size="17" fill="${BRAND.muted}" font-family="${BRAND.font}">${esc(watermark.replace(/\s*MIGI\s*$/i, "").trim() || "Created by")}</text>
-    <text x="72" y="48" font-size="22" font-weight="700" fill="${BRAND.ink}" font-family="${BRAND.font}">MIGI</text>
+  <!-- MIGI mark + credit, bottom-right. Text is right-aligned to the padding edge so a longer
+       descriptor can never collide with the author block on the left. -->
+  <g transform="translate(0, ${S - 182})">
+    ${migiMark(S - pad - 300, 2, 52)}
+    <text x="${S - pad}" y="26" font-size="22" font-weight="700" fill="${BRAND.ink}" font-family="${BRAND.font}" text-anchor="end">${esc(watermark)}</text>
+    <text x="${S - pad}" y="50" font-size="17" fill="${BRAND.muted}" font-family="${BRAND.font}" text-anchor="end">${esc(descriptor)}</text>
   </g>
 </svg>`;
 }
