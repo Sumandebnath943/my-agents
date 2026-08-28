@@ -102,6 +102,17 @@ if (process.env.LINKEDIN_POST_IMAGE === "1") {
 
     mediaId = init.image;
     cardAlt = picked.line;
+
+    // Keep the PNG so the SAME artwork can be reused when this post is repurposed to Bluesky and
+    // Mastodon. The path is derived from the post id, so no column is needed to find it again.
+    // Best-effort: failing to archive the card must not affect the LinkedIn post that just worked.
+    try {
+      await db.storage.createBucket("linkedin", { public: false }).catch(() => {});
+      const up = await db.storage.from("linkedin").upload(`card-${postId}.png`, png, { contentType: "image/png", upsert: true });
+      console.log(up.error ? `card: archive failed — ${up.error.message}` : `card: archived as linkedin/card-${postId}.png for cross-posting`);
+    } catch (e) {
+      console.log("card: archive failed —", e.message);
+    }
     console.log(`card: attached ${png.length} bytes as ${mediaId} — "${picked.line.slice(0, 70)}"`);
   } catch (e) {
     console.error(`card: SKIPPED, posting text-only — ${e.message}`);

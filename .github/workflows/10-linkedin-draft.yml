@@ -37,6 +37,10 @@ jobs:
       - run: node agents/10-linkedin/10a-draft.js
         env:
           AGENT_NAME: linkedin
+          # Renders the card and sends it to Telegram WITH the draft, so the image is reviewed
+          # before approval rather than discovered on the feed. Must match 10-linkedin-post.yml,
+          # or you would approve a card that never ships (or ship one you never saw).
+          LINKEDIN_POST_IMAGE: "1"
           EDIT_ID: ${{ github.event.inputs.edit_id }}
           EDIT_NOTE: ${{ github.event.inputs.edit_note }}
           NEWS_IDX: ${{ github.event.inputs.news_idx }}

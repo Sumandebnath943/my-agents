@@ -11,7 +11,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callGroq, geminiThenGroq, parseJson } from "../../lib/llm.js";
-import { notifyTelegram, tgEscape } from "../../lib/notify.js";
+import { notifyTelegram, notifyTelegramPhoto, tgEscape } from "../../lib/notify.js";
 import { PROFILE, profileContext } from "../../lib/profile.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { AI_FEEDS, SCRAPE_BLOCKED } from "./sources.js";
@@ -205,6 +205,30 @@ async function sendDraft(id, row) {
     `📝 <b>LinkedIn draft</b> <i>(id ${id})</i>${row.headline ? `\n<i>Re: ${tgEscape(row.headline)}</i>` : ""}\n\n${tgEscape(row.post)}\n\n${tgEscape(row.hashtags || "")}${row.grounding ? `\n\n<i>grounded in: ${tgEscape(row.grounding)}</i>` : ""}${warn}`,
     { html: true, buttons }
   );
+
+  // Show the card BEFORE approval — you should see the picture that will carry your name, not
+  // discover it on the feed. Rendering is deterministic, so this preview is byte-identical to what
+  // publish will attach for the same text. Best-effort: a preview failure must never block a draft.
+  if (process.env.LINKEDIN_POST_IMAGE === "1") {
+    try {
+      const { renderCard, pickCardLine } = await import("./card.js");
+      const rephrase = async (line) => callGroq([
+        { role: "system", content: "Rewrite the sentence so it expresses the same idea in completely different words. Change the structure and vocabulary, not just a word or two. Under 150 characters, declarative, no quotes, no hashtags. Reply with the rewritten sentence and nothing else." },
+        { role: "user", content: `Rewrite this, avoiding the phrasing of this headline: "${row.headline || ""}"\n\nSentence: ${line}` },
+      ]);
+      const picked = await pickCardLine(row.post, { sourceHeadline: row.headline || "", rephrase });
+      if (!picked.line) {
+        await notifyTelegram(`🖼️ <i>No card for this one — every line was too close to the source headline (${picked.similarity}). It will post as text.</i>`, { html: true });
+        return;
+      }
+      const png = renderCard({ quote: picked.line });
+      if (png) {
+        await notifyTelegramPhoto(png, `🖼️ <b>Card for draft ${id}</b>\n<i>${tgEscape(picked.line)}</i>\n<i>via ${picked.via} · ${picked.similarity} similarity to the source headline</i>`, { filename: `card-${id}.png` });
+      }
+    } catch (e) {
+      console.error("card preview failed (draft unaffected):", e.message);
+    }
+  }
 }
 
 async function safetyReview(post) {
