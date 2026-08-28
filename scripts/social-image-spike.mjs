@@ -67,8 +67,14 @@ if (!inst || !process.env.MASTODON_TOKEN) {
     const up = await fetch(`${inst}/api/v2/media`, {
       method: "POST", headers: { Authorization: `Bearer ${process.env.MASTODON_TOKEN}`, Accept: "application/json", "User-Agent": "migi/1.0" }, body: form,
     });
-    if (up.status === 401 || up.status === 403) {
-      throw new Error(`media ${up.status} — token is missing the write:media scope (write:statuses alone posts text but cannot attach images)`);
+    // 401 and 403 point at different fixes. 401: the token is rejected outright — and note that
+    // editing an app's scopes in Mastodon INVALIDATES tokens issued under the old scopes, so
+    // "I just enabled write:media" is a common route to a 401. 403: valid token, wrong permissions.
+    if (up.status === 401) {
+      throw new Error("media 401 — token invalid or revoked. Editing app scopes invalidates existing tokens: regenerate it and update MASTODON_TOKEN in Vercel, then redeploy");
+    }
+    if (up.status === 403) {
+      throw new Error("media 403 — token is valid but lacks the write:media scope");
     }
     if (up.status === 413) throw new Error(`media 413 — ${bytes.length} bytes exceeds this instance's upload limit`);
     if (!up.ok && up.status !== 202) throw new Error(`media ${up.status}: ${(await up.text()).slice(0, 160)}`);
