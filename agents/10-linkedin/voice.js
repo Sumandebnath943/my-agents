@@ -30,6 +30,9 @@ name. Lead with YOUR claim, your observation, or the tension you see; bring in w
 STRUCTURE — pick the ONE shape that fits the idea:
 - Story: setup → the tension nobody could solve → the turn → a one-line lesson.
 - Framework: name the idea → 2–4 crisp parts (numbered or •, each with a tight explainer) → why it matters now.
+  A framework has AT LEAST TWO parts. If you write "1." there must be a "2." — one numbered item is
+  never correct. And each part gets ONE or TWO explainer lines, not a paragraph stack: if you find
+  yourself writing a fifth line under a single item, it is not a framework, it is a POV post.
 - How-to / workflow: the promise → the concrete steps (→ or •) → the payoff.
 - POV / analysis: the shift I'm seeing → why it's happening → what it means for the reader.
 

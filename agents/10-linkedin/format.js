@@ -36,7 +36,19 @@ export function normalizeListMarkers(text) {
     const p = RE_PLAIN.exec(lines[i]);
     if (p) marked.push({ i, kind: "plain", num: Number(p[2]), indent: p[1] });
   }
-  if (marked.length < 2) return text;   // a lone marker is not a list we can reason about
+  // A LONE MARKER IS NEVER A LIST. Observed in a real draft: the model opened a framework with
+  // "1. Build a shared context layer", then wrote seven indented explainer lines instead of items
+  // 2 and 3 — so the post shipped with a single orphaned "1.".
+  //
+  // Strip it rather than invent siblings. Numbering those explainers would have produced
+  // "2. A single source of truth lets..." — confidently wrong, and worse than the original. The
+  // asymmetry is the point: REMOVING a stray marker cannot corrupt prose, ADDING one can.
+  if (marked.length === 1 && marked[0].num === 1) {
+    const m = marked[0];
+    lines[m.i] = m.indent + lines[m.i].replace(m.kind === "keycap" ? RE_KEYCAP : RE_PLAIN, "");
+    return lines.join("\n");
+  }
+  if (marked.length < 2) return text;   // any other lone marker: leave well alone
 
   // 2. Split into groups: numbering restarting at 1, or a big gap, means a new list.
   const groups = [];

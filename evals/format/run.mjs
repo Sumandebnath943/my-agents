@@ -46,6 +46,24 @@ export async function run() {   // async: the card-line checks await pickCardLin
       in: `  ${K(1)} alpha\n  2. beta`,
       want: `  ${K(1)} alpha\n  ${K(2)} beta`,
     },
+    // THE REAL DRAFT-79 SHAPE: the model opened a framework with one item, then wrote indented
+    // explainers instead of items 2 and 3. The orphan marker is stripped; the explainers are
+    // left exactly as they are, because numbering them would be confidently wrong.
+    {
+      id: "an orphan '1.' is stripped, explainers untouched",
+      in: "Here's what I've learned:\n\n1. Build a shared context layer\n   A single source of truth lets everyone see the same story.\n   Store every interaction in that layer.\n\nThe future belongs to operators.",
+      want: "Here's what I've learned:\n\nBuild a shared context layer\n   A single source of truth lets everyone see the same story.\n   Store every interaction in that layer.\n\nThe future belongs to operators.",
+    },
+    {
+      id: "an orphan keycap 1️⃣ is stripped too",
+      in: `${K(1)} The only item\nand some prose under it`,
+      want: "The only item\nand some prose under it",
+    },
+    {
+      id: "a real two-item list is NOT stripped",
+      in: "1. First\n2. Second",
+      want: "1. First\n2. Second",
+    },
   ];
   const fixes = runCases("format · numbered lists get one consistent style", fixCases, (c) => {
     const got = normalizeListMarkers(c.in);
@@ -55,7 +73,6 @@ export async function run() {   // async: the card-line checks await pickCardLin
   const leaveCases = [
     { id: "already consistent keycaps untouched", in: `${K(1)} a\n${K(2)} b\n${K(3)} c` },
     { id: "already consistent plain untouched", in: "1. a\n2. b\n3. c" },
-    { id: "a lone marker is never guessed at", in: `${K(1)} the only numbered line\nthis is prose, not an item` },
     { id: "prose with no markers untouched", in: "I shipped 3 agents this week.\nIt took 2 days." },
     { id: "bullets are not touched", in: "• alpha\n• beta\n• gamma" },
     { id: "a year at line start is not a marker", in: "2026 was the year.\n2027 will be bigger." },
