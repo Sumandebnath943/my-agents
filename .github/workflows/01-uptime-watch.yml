@@ -1,9 +1,11 @@
 # .github/workflows/01-uptime-watch.yml
-# Frequent watch every 30 min — NO DIGEST flag, so it only pings when a site is down.
+# Frequent watch every 2 hours — NO DIGEST flag, so it only pings when a site is down.
+# Was */30: GitHub throttles high-frequency crons and a 137-events/day fleet built a growing
+# backlog (12h late by 2026-08-28). Anything below 2-hourly buys nothing — see SECURITY_POSTURE.md §8.
 name: Uptime Sentinel (Watch)
 on:
   schedule:
-    - cron: "*/30 * * * *" # every 30 min
+    - cron: "0 */2 * * *" # every 2 hours
   workflow_dispatch:
 permissions:
   contents: read
