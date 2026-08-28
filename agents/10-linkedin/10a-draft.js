@@ -440,7 +440,13 @@ if (process.env.REGEN_ID) {
   const id = process.env.REGEN_ID;
   const { data: row } = await db.from("linkedin_posts").select("*").eq("id", id).maybeSingle();
   if (!row) { console.log("regen: post not found", id); process.exit(0); }
-  await writePost({ headline: row.headline, link: row.source_url, angle: "" }, { regenOf: id, previousPost: row.post });
+  // `source` must be derived here: a regenerate rebuilds the item from the saved row, which stores
+  // source_url but not the publisher label — without this the credit line silently vanished on
+  // every regenerated draft while fresh ones carried it.
+  await writePost(
+    { headline: row.headline, link: row.source_url, source: row.source_url ? sourceName(row.source_url) : "", angle: "" },
+    { regenOf: id, previousPost: row.post }
+  );
   process.exit(0);
 }
 
