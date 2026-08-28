@@ -83,6 +83,25 @@ export function normalizeListMarkers(text) {
 }
 
 /**
+ * Strip the whitespace artefacts LinkedIn renders literally.
+ *
+ * LinkedIn has no indentation and no leading-space collapsing: the model's tidy three-space indent
+ * under a list item arrives on the feed as a visible ragged gap before the sentence. Real drafts
+ * also carried trailing double-spaces (a markdown line-break idiom that means nothing here) and
+ * "blank" lines made of spaces, which render as an extra empty row.
+ *
+ * Structure is preserved — blank lines still separate blocks, they just stop being made of spaces.
+ */
+export function tidyWhitespace(text) {
+  if (typeof text !== "string" || !text) return text;
+  return text
+    .replace(/[ \t]+$/gm, "")        // trailing spaces (incl. the markdown two-space break)
+    .replace(/^[ \t]+/gm, "")        // leading indent — LinkedIn shows it as a literal gap
+    .replace(/\n{3,}/g, "\n\n")      // never more than one blank line between blocks
+    .trim();
+}
+
+/**
  * Append a source credit, idempotently.
  *
  * WHY: the post's prose is original — measured 0% six-word overlap with the source article — but

@@ -16,7 +16,7 @@ import { PROFILE, profileContext } from "../../lib/profile.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { AI_FEEDS, SCRAPE_BLOCKED } from "./sources.js";
 import { scrapeClean } from "../../lib/scrape.js";
-import { normalizeListMarkers, withSignature, withCredit } from "./format.js";
+import { normalizeListMarkers, withSignature, withCredit, tidyWhitespace } from "./format.js";
 
 // Signature appended to every published post. Set LINKEDIN_SIGNATURE="" to switch it off entirely
 // without touching code; applied idempotently so regenerates never stack it.
@@ -377,7 +377,9 @@ Voice bar: ${VALUE_BAR}`,
   // playbook asks for consistent list markers; this guarantees it. Then sign, idempotently, so a
   // regenerate or an edit can never stack two signatures.
   // Credit BEFORE the signature so the order reads: post → who reported it → who drafted it.
-  o.post = withSignature(withCredit(normalizeListMarkers(o.post), item.source), POST_SIGNATURE);
+  // Order matters: normalise markers while the indent is still there, THEN strip the indent
+  // (LinkedIn renders leading spaces literally), then credit, then sign.
+  o.post = withSignature(withCredit(tidyWhitespace(normalizeListMarkers(o.post)), item.source), POST_SIGNATURE);
 
   const hashtags = (await trendingHashtags(item.headline || "AI", { platform: "linkedin", count: 3 })).join(" ");
   const review = await safetyReview(o.post);
@@ -423,7 +425,7 @@ Return ONLY JSON {"post":"revised post text, formatted with real line breaks"}.`
   let revised = row.post; try { revised = stripMarkdown(parseJson(out).post || row.post); } catch {}
   // Same treatment as a fresh draft: an edit can just as easily produce a ragged list, and
   // withSignature is idempotent so re-signing an already-signed post is a no-op.
-  revised = withSignature(withCredit(normalizeListMarkers(revised), row.source_url ? sourceName(row.source_url) : ""), POST_SIGNATURE);
+  revised = withSignature(withCredit(tidyWhitespace(normalizeListMarkers(revised)), row.source_url ? sourceName(row.source_url) : ""), POST_SIGNATURE);
   const review = await safetyReview(revised);
   if (review.hard) { await notifyTelegram(`🛑 Revised draft blocked by the safety filter (${review.reasons.join(", ")}). Not sent.`, { html: true }); process.exit(0); }
   const warning = review.safe ? null : review.reasons.join("; ");

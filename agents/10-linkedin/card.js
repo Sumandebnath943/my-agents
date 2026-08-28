@@ -304,13 +304,15 @@ export function cardSvg({
   const S = CARD_SIZE;
   const pad = 96;
   const boxW = S - pad * 2;
-  // Centre the quote in the space between the kicker and the footer rule, rather than pinning it
-  // near the top — a short quote otherwise left a large dead zone in the middle of the card.
-  const TOP = 210, BOTTOM = S - 250;
+  // TOP-ANCHOR the quote just under the kicker, rather than centring it in the space between the
+  // kicker and the footer. Centring split the empty space in two and left a conspicuous void
+  // between "AI, IN PRACTICE" and the first line — it read as a gap, not as breathing room.
+  // Anchored, the quote leads the card and all the whitespace pools above the footer, where it
+  // looks deliberate. Long quotes still shrink to fit via fitText.
+  const TOP = 254, BOTTOM = S - 250;
   const { size, lines } = fitText(quote, { maxWidth: boxW, maxHeight: BOTTOM - TOP });
   const lineH = size * 1.28;
-  const blockH = lines.length * lineH;
-  const startY = (TOP + BOTTOM) / 2 - blockH / 2 + size * 0.82;
+  const startY = TOP + size * 0.82;   // first baseline; the block grows downward from here
 
   const quoteLines = lines
     .map((l, i) => `<text x="${pad}" y="${(startY + i * lineH).toFixed(1)}" font-size="${size}" font-weight="700" fill="${BRAND.ink}" font-family="${BRAND.font}">${esc(l)}</text>`)

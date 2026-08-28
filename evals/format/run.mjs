@@ -7,7 +7,7 @@
 // lists, and two separate lists that merely sit in the same post.
 import "../_env.mjs";
 import { runCases, isMain } from "../_lib.mjs";
-import { normalizeListMarkers, withSignature, withCredit } from "../../agents/10-linkedin/format.js";
+import { normalizeListMarkers, withSignature, withCredit, tidyWhitespace } from "../../agents/10-linkedin/format.js";
 import { similarity, pickCardLine, candidateLines } from "../../agents/10-linkedin/card.js";
 import { pullQuote, wrapText, fitText, cardSvg } from "../../agents/10-linkedin/card.js";
 import { PROFILE } from "../../lib/profile.js";
@@ -159,6 +159,21 @@ export async function run() {   // async: the card-line checks await pickCardLin
   ];
   const layout = runCases("card · layout + escaping", layoutCases, (c) => ({ ok: c.check() }));
 
+  // LinkedIn renders leading spaces literally, so the model's tidy indent under a list item
+  // arrived on the feed as a ragged gap before the sentence. Real draft-79 symptom.
+  const tidyCases = [
+    { id: "leading indent under a list item is stripped", check: () => tidyWhitespace("1. Item\n   Explainer line") === "1. Item\nExplainer line" },
+    { id: "trailing markdown double-space is removed", check: () => tidyWhitespace("Line one  \nLine two") === "Line one\nLine two" },
+    { id: "a whitespace-only line becomes truly blank", check: () => tidyWhitespace("A\n   \nB") === "A\n\nB" },
+    { id: "three or more blank lines collapse to one gap", check: () => tidyWhitespace("A\n\n\n\nB") === "A\n\nB" },
+    { id: "a single blank line between blocks survives", check: () => tidyWhitespace("A\n\nB") === "A\n\nB" },
+    { id: "leading/trailing whitespace on the post is trimmed", check: () => tidyWhitespace("\n\n  Hello\n\n") === "Hello" },
+    { id: "words and punctuation are untouched", check: () => tidyWhitespace("Keep  internal   spacing.") === "Keep  internal   spacing." },
+    { id: "empty string safe", check: () => tidyWhitespace("") === "" },
+    { id: "null safe", check: () => tidyWhitespace(null) === null },
+  ];
+  const tidies = runCases("format · whitespace LinkedIn renders literally", tidyCases, (c) => ({ ok: c.check() }));
+
   const creditCases = [
     { id: "appends the credit", check: () => withCredit("Body text", "VentureBeat") === "Body text\n\nVia VentureBeat" },
     { id: "idempotent — never credits twice", check: () => withCredit("Body\n\nVia VentureBeat", "VentureBeat") === "Body\n\nVia VentureBeat" },
@@ -218,7 +233,7 @@ export async function run() {   // async: the card-line checks await pickCardLin
   ];
   const picks = await runCasesAsync("card · never restates the source", pickCases);
 
-  return [fixes, left, groups, sigs, quotes, layout, credits, sims, picks];
+  return [fixes, left, groups, sigs, quotes, layout, tidies, credits, sims, picks];
 }
 
 /** runCases is sync; these checks are async, so mirror its shape and reporting. */
