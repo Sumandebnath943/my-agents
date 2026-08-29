@@ -2,7 +2,7 @@
 name: LinkedIn Weekly Recap
 on:
   schedule:
-    - cron: "30 14 * * 0"   # Sundays ~8 PM IST
+    - cron: "23 14 * * 0"   # Sundays ~8 PM IST
   workflow_dispatch:
 permissions:
   contents: read

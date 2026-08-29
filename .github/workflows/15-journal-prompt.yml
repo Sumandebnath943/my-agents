@@ -3,7 +3,7 @@
 name: Journal Evening Prompt
 on:
   schedule:
-    - cron: "30 16 * * *"   # ~10:00 PM IST
+    - cron: "29 16 * * *"   # ~10:00 PM IST
   workflow_dispatch:
 permissions:
   contents: read

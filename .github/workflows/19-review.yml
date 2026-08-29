@@ -2,7 +2,7 @@
 name: Weekly Founder Review
 on:
   schedule:
-    - cron: "30 15 * * 0"   # Sundays ~9 PM IST
+    - cron: "21 15 * * 0"   # Sundays ~9 PM IST
   workflow_dispatch:
 permissions:
   contents: read

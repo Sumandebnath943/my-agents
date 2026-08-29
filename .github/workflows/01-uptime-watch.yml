@@ -5,7 +5,7 @@
 name: Uptime Sentinel (Watch)
 on:
   schedule:
-    - cron: "0 */2 * * *" # every 2 hours
+    - cron: "7 */2 * * *" # every 2 hours
   workflow_dispatch:
 permissions:
   contents: read

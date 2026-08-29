@@ -6,8 +6,8 @@ on:
   schedule:
     # Was */30 — throttled into a growing backlog. The `health` job's `if:` below matches this
     # string EXACTLY; change one without the other and the job silently never runs again.
-    - cron: "0 */2 * * *"    # provider health pings, every 2 hours
-    - cron: "0 5 * * 1"      # weekly report, Monday ~10:30 AM IST
+    - cron: "3 */2 * * *"    # provider health pings, every 2 hours
+    - cron: "7 5 * * 1"      # weekly report, Monday ~10:30 AM IST
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   health:
-    if: github.event.schedule == '0 */2 * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '3 */2 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -38,7 +38,7 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
   report:
-    if: github.event.schedule == '0 5 * * 1' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '7 5 * * 1' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

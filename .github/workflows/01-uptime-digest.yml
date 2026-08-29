@@ -3,7 +3,7 @@
 name: Uptime Sentinel (Daily Digest)
 on:
   schedule:
-    - cron: "30 2 * * *"   # 8:00 AM IST daily
+    - cron: "27 2 * * *"   # 8:00 AM IST daily
   workflow_dispatch:
 permissions:
   contents: read

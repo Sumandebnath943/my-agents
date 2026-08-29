@@ -2,7 +2,7 @@
 name: Daily Tech Briefing
 on:
   schedule:
-    - cron: "0 2 * * *"    # ~7:30 AM IST
+    - cron: "13 2 * * *"    # ~7:30 AM IST
   workflow_dispatch:
 permissions:
   contents: read

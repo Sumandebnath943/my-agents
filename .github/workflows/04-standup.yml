@@ -2,7 +2,7 @@
 name: Morning Standup
 on:
   schedule:
-    - cron: "30 2 * * 1-5"   # 8 AM IST, weekdays
+    - cron: "37 2 * * 1-5"   # 8 AM IST, weekdays
   workflow_dispatch:
 permissions:
   contents: read

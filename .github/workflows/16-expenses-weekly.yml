@@ -3,7 +3,7 @@
 name: Expenses Weekly Summary
 on:
   schedule:
-    - cron: "0 4 * * 0"    # Sundays ~9:30 AM IST
+    - cron: "19 4 * * 0"    # Sundays ~9:30 AM IST
   workflow_dispatch:
 permissions:
   contents: read

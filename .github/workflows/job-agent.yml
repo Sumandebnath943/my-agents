@@ -2,7 +2,7 @@
 name: Apply-Ready Job Agent
 on:
   schedule:
-    - cron: "30 1 * * 1-5"    # weekday mornings, 7 AM IST
+    - cron: "27 1 * * 1-5"    # weekday mornings, 7 AM IST
   workflow_dispatch:
 permissions:
   contents: read

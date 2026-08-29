@@ -4,8 +4,8 @@
 name: Habits Check-in
 on:
   schedule:
-    - cron: "30 1 * * *"    # 07:00 IST — morning: how did you sleep?
-    - cron: "0 16 * * *"    # 21:30 IST — evening: productivity + mood (before the 22:00 journal prompt)
+    - cron: "35 1 * * *"    # 07:00 IST — morning: how did you sleep?
+    - cron: "21 16 * * *"    # 21:30 IST — evening: productivity + mood (before the 22:00 journal prompt)
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
           AGENT_NAME: habits
           # github.event.schedule holds the cron string that triggered this run; a manual dispatch
           # has none, so it falls through to the morning prompt.
-          MODE: ${{ github.event.schedule == '0 16 * * *' && 'evening' || 'morning' }}
+          MODE: ${{ github.event.schedule == '21 16 * * *' && 'evening' || 'morning' }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

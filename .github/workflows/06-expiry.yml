@@ -2,7 +2,7 @@
 name: Expiry Watcher
 on:
   schedule:
-    - cron: "0 4 * * 1"    # weekly, Monday
+    - cron: "11 4 * * 1"    # weekly, Monday
   workflow_dispatch:
 permissions:
   contents: read

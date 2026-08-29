@@ -3,7 +3,7 @@
 name: Uptime Sentinel (6-Hourly)
 on:
   schedule:
-    - cron: "0 */6 * * *"  # every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: "3 */6 * * *"  # every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
   workflow_dispatch:
 permissions:
   contents: read

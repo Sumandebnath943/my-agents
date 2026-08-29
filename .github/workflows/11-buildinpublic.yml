@@ -2,7 +2,7 @@
 name: Build-in-Public Draft
 on:
   schedule:
-    - cron: "30 15 * * *"   # ~9 PM IST daily
+    - cron: "25 15 * * *"   # ~9 PM IST daily
   workflow_dispatch:
 permissions:
   contents: read

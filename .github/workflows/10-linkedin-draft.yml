@@ -2,7 +2,7 @@
 name: LinkedIn Draft
 on:
   schedule:
-    - cron: "30 1 * * *"   # 7:00 AM IST daily — curates the day's news list to pick from
+    - cron: "41 1 * * *"   # 7:00 AM IST daily — curates the day's news list to pick from
   workflow_dispatch:
     inputs:
       edit_id:

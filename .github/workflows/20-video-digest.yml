@@ -2,7 +2,7 @@
 name: Evening Video Digest
 on:
   schedule:
-    - cron: "30 15 * * *"   # 9:00 PM IST daily
+    - cron: "38 15 * * *"   # 9:00 PM IST daily
   workflow_dispatch:
 permissions:
   contents: read

@@ -2,7 +2,7 @@
 name: Skill Gap Advisor
 on:
   schedule:
-    - cron: "0 4 1 * *"    # 1st of each month (~09:30 IST)
+    - cron: "23 4 1 * *"    # 1st of each month (~09:30 IST)
   workflow_dispatch:
 permissions:
   contents: read

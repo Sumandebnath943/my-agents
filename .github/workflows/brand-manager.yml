@@ -4,8 +4,8 @@
 name: Brand Manager
 on:
   schedule:
-    - cron: "0 1 * * *"   # daily ~6:30 AM IST — rolling page scan
-    - cron: "0 4 * * 1"   # Mon ~9:30 AM IST — weekly report
+    - cron: "53 1 * * *"   # daily ~6:30 AM IST — rolling page scan
+    - cron: "51 4 * * 1"   # Mon ~9:30 AM IST — weekly report
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   scan:
-    if: github.event.schedule == '0 1 * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '53 1 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -36,7 +36,7 @@ jobs:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
   report:
-    if: github.event.schedule == '0 4 * * 1' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '51 4 * * 1' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

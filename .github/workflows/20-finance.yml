@@ -4,8 +4,8 @@
 name: Finance Ledger
 on:
   schedule:
-    - cron: "30 3 * * 0"      # weekly digest Sun (uses default = week)
-    - cron: "30 3 1 * *"      # monthly digest on the 1st
+    - cron: "26 3 * * 0"      # weekly digest Sun (uses default = week)
+    - cron: "34 3 1 * *"      # monthly digest on the 1st
   workflow_dispatch:
     inputs:
       period:
@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   weekly:
-    if: github.event.schedule == '30 3 * * 0' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '26 3 * * 0' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -44,7 +44,7 @@ jobs:
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
           MY_EMAIL: ${{ secrets.MY_EMAIL }}
   monthly:
-    if: github.event.schedule == '30 3 1 * *'
+    if: github.event.schedule == '34 3 1 * *'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
