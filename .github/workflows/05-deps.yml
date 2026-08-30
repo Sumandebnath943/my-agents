@@ -2,7 +2,7 @@
 name: Dependency Digest
 on:
   schedule:
-    - cron: "39 3 * * 1"   # Mondays ~9 AM IST
+    - cron: "39 10 * * 1"   # Mondays ~16:09 IST
   workflow_dispatch:
 permissions:
   contents: read

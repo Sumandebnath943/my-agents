@@ -2,7 +2,7 @@
 name: Supabase Keep-Alive
 on:
   schedule:
-    - cron: "9 3 * * *"   # daily, well within the 7-day window
+    - cron: "11 9 * * *"   # daily 14:41 IST, well within the 7-day window
   workflow_dispatch:
 permissions:
   contents: read

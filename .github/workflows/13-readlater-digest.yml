@@ -3,7 +3,7 @@
 name: Read Later Digest
 on:
   schedule:
-    - cron: "17 4 * * 0"    # Sundays ~9:30 AM IST
+    - cron: "47 9 * * 0"    # Sundays ~15:17 IST
   workflow_dispatch:
 permissions:
   contents: read

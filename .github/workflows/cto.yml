@@ -3,7 +3,7 @@
 name: CTO Review
 on:
   schedule:
-    - cron: "57 3 * * *"   # daily ~8:30 AM IST
+    - cron: "17 13 * * *"   # daily ~18:47 IST
   workflow_dispatch:
 permissions:
   contents: read

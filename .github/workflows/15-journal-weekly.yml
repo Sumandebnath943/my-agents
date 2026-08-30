@@ -2,7 +2,7 @@
 name: Journal Weekly Reflection
 on:
   schedule:
-    - cron: "31 3 * * 0"    # Sundays ~9:00 AM IST
+    - cron: "1 6 * * 0"    # Sundays ~11:31 IST
   workflow_dispatch:
 permissions:
   contents: read

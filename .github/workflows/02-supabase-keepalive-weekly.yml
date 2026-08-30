@@ -4,7 +4,7 @@
 name: Supabase Keep-Alive (Weekly Digest)
 on:
   schedule:
-    - cron: "33 2 * * 1"   # Mondays 8:00 AM IST
+    - cron: "33 9 * * 1"   # Mondays 15:03 IST
   workflow_dispatch:
 permissions:
   contents: read

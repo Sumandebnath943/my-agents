@@ -3,7 +3,7 @@
 name: Habits Weekly Insight
 on:
   schedule:
-    - cron: "43 3 * * 0"    # Sundays ~9:00 AM IST
+    - cron: "43 6 * * 0"    # Sundays ~12:13 IST
   workflow_dispatch:
 permissions:
   contents: read
