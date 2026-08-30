@@ -31,3 +31,7 @@ SECURITY_POSTURE*.md
 # Published-artifact source (claude.ai/code/artifact/e694b8af). Generated, not fleet code, and
 # the timetable now lives at /dashboard/timetable — kept locally so the artifact can be republished.
 fleet-timetable.html
+
+# Dispatcher planning records — internal operational detail (Vercel/Supabase usage, schedules).
+# Same reason as PROJECT_BIBLE/HANDOFF/SECURITY_POSTURE: this repo is public.
+DISPATCHER_*.md
