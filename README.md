@@ -27,11 +27,33 @@ shared Supabase schema:
 
 ## Architecture
 
-**Scheduling.** 48 workflows, ~34 of them cron-scheduled, spread across the day and budgeted to
+**Scheduling.** 48 workflows, 34 of them cron-scheduled, spread across the day and budgeted to
 about 53 scheduled events daily. Each is pinned to `contents: read` — no workflow in the fleet has
 write access to the repository. Cadence is deliberately conservative: GitHub throttles
 high-frequency `schedule` triggers, and a fleet that asks too often gets its dispatches delayed by
 hours rather than rate-limited outright.
+
+The day is deliberately **spread rather than clustered**: sixteen agents used to fire between 6 and
+11am IST, and only seven need to. Seven remain in the morning — the ones whose value is tied to
+being morning — and the rest sit through the afternoon and evening. Sixteen simultaneous LLM calls
+against a 10-requests-per-minute free tier is the shape of a rate-limit storm, and an identical
+morning every weekday makes a fault obvious.
+
+**Schedules are best-effort, and since 27 Aug 2026 they have not been reliable.** GitHub keeps no
+record of a `schedule` event it drops — no API, no log, no status field — so a cron that never
+fires leaves zero trace. A dispatcher on the control dashboard closes the gap: it compares due
+times against actual run history and re-fires what GitHub missed via `workflow_dispatch`, which has
+never been throttled. **Nothing in this repo depends on it.** Every agent keeps its own GitHub
+schedule, no workflow is disabled, and with the dispatcher switched off the fleet behaves exactly
+as it did before — late sometimes, but working.
+
+Two consequences worth knowing before editing a cron here:
+
+- **The dashboard keeps a hardcoded mirror of every cron** (`lib/agents-meta.js`). Change a cron
+  here and you must change it there, or every next-run countdown lies silently. Run the dashboard's
+  `scripts/cron-crosscheck.mjs` before committing any schedule change.
+- **Several workflows gate their jobs on `github.event.schedule == '<exact cron>'`.** Move a cron
+  without moving its gate and that job silently never runs again, with no error anywhere.
 
 **Model routing.** Agents call a multi-provider layer spanning Groq, Gemini, Cerebras,
 Mistral, OpenRouter and OpenAI, with automatic failover and rate-limit-aware pacing so the
