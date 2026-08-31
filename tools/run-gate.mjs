@@ -47,6 +47,12 @@ const CONFIRM = process.argv.includes("--confirm");
 const KV_TUNING = "dispatch:tuning";
 const KV_ENABLED = "dispatch:enabled";
 
+// How far back a dispatched run will look for a dispatcher claim to adopt. Deliberately short:
+// long enough to cover a dispatch plus a slow runner boot, short enough that a human pressing Run
+// cannot accidentally confirm a stale claim left by an earlier FAILED dispatcher run — which would
+// mark a slot done that nobody actually completed.
+const ADOPT_WINDOW_MIN = 15;
+
 function output(name, value) {
   const f = process.env.GITHUB_OUTPUT;
   if (f) { try { appendFileSync(f, `${name}=${value}\n`); } catch {} }
@@ -81,17 +87,60 @@ async function main() {
   if (mode === "off") return done(false, false, "gate: gateMode=off — running");
 
   // ── the confirm pass ────────────────────────────────────────────────────────────────────
-  if (CONFIRM) {
-    const slot = slotFor(CRON, new Date());
-    if (!slot) return done(false, false, "gate(confirm): no slot — nothing to confirm");
-    const key = claimKey(AGENT, CRON, slot);
-    const { data } = await db.from("kv").select("value").eq("key", key).maybeSingle();
-    if (!data) return done(false, false, `gate(confirm): no claim at ${key}`);
+  //
+  // Two shapes, because the two triggers know different things.
+  //
+  // A SCHEDULED run knows its cron (GitHub supplies `github.event.schedule`), so it can compute
+  // its own slot and confirm exactly that claim.
+  //
+  // A DISPATCHED run knows nothing — GitHub does not say which schedule a dispatch stands in for.
+  // It therefore adopts the dispatcher's own claim: the most recent unconfirmed one for this
+  // agent, made in the last few minutes.
+  //
+  // WHY THAT MATTERS. Without it, a dispatcher claim stays unconfirmed until the dispatcher's NEXT
+  // cycle notices the run succeeded — up to 30 minutes. The gate refuses to skip on an unconfirmed
+  // claim (an unconfirmed claim may mean the run failed), so for those 30 minutes GitHub's own
+  // delivery would run the agent a second time. That window is the only reason `graceMin` cannot
+  // drop below GitHub's normal lateness. Closing it here is what makes a low grace safe.
+  const confirmRow = async (key, value) => {
     await db.from("kv").update({
-      value: { ...(data.value || {}), ok: true, confirmed_at: new Date().toISOString() },
+      value: { ...(value || {}), ok: true, confirmed_at: new Date().toISOString() },
       updated_at: new Date().toISOString(),
     }).eq("key", key);
-    return done(false, false, `gate(confirm): slot ${slotKey(slot)} confirmed done`);
+  };
+
+  if (CONFIRM) {
+    if (EVENT === "schedule" && CRON) {
+      const slot = slotFor(CRON, new Date());
+      if (!slot) return done(false, false, "gate(confirm): no slot — nothing to confirm");
+      const key = claimKey(AGENT, CRON, slot);
+      const { data } = await db.from("kv").select("value").eq("key", key).maybeSingle();
+      if (!data) return done(false, false, `gate(confirm): no claim at ${key}`);
+      await confirmRow(key, data.value);
+      return done(false, false, `gate(confirm): slot ${slotKey(slot)} confirmed done`);
+    }
+
+    // Dispatched run. Query by time rather than by a LIKE on the agent name — names contain
+    // spaces, parentheses and a `·`, and one containing `%` or `_` would silently become a
+    // wildcard. Filter for this agent in JS instead.
+    const since = new Date(Date.now() - ADOPT_WINDOW_MIN * 60000).toISOString();
+    const { data: rows } = await db.from("kv").select("key,value,updated_at")
+      .like("key", "gate:%").gte("updated_at", since);
+
+    const mine = (rows || [])
+      .filter((r) => r.key.startsWith(`gate:${AGENT}:`))
+      .filter((r) => r.value?.by === "dispatcher" && !r.value?.ok)
+      .sort((a, b) => String(b.value?.at || "").localeCompare(String(a.value?.at || "")));
+
+    if (!mine.length) {
+      // A human pressing Run, or a dispatch the dispatcher did not make. Nothing to adopt, and
+      // nothing should be invented — confirming a slot nobody claimed would let the gate skip a
+      // run that was never covered.
+      return done(false, false, "gate(confirm): no recent unconfirmed dispatcher claim — nothing to adopt");
+    }
+
+    await confirmRow(mine[0].key, mine[0].value);
+    return done(false, false, `gate(confirm): adopted and confirmed ${mine[0].key.replace(/^gate:/, "")}`);
   }
 
   // ── rule 1: only schedule events are gated ──────────────────────────────────────────────

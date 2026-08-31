@@ -43,7 +43,7 @@ jobs:
       # Mark the slot done only on success. An unconfirmed claim means the run failed, so the
       # slot stays open and GitHub's later delivery is allowed through rather than skipped.
       - name: confirm slot
-        if: always() && steps.gate.outputs.claimed == 'true' && job.status == 'success'
+        if: always() && job.status == 'success' && (steps.gate.outputs.claimed == 'true' || github.event_name == 'workflow_dispatch')
         continue-on-error: true
         run: node tools/run-gate.mjs --confirm
         env:
