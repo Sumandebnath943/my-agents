@@ -9,6 +9,15 @@ on:
     - cron: "3 */2 * * *"    # provider health pings, every 2 hours
     - cron: "7 5 * * 1"      # weekly report, Monday ~10:30 AM IST
   workflow_dispatch:
+    inputs:
+      mode:
+        # Lets a dispatch name ONE job. Without it every dispatch ran BOTH, so the dispatcher
+        # could not rescue a dropped health ping without also emitting a weekly report — twelve a
+        # day. Default "both" keeps a bare dispatch (/team, the dashboard Run button) behaving
+        # exactly as it always has.
+        description: "health, report, or both"
+        required: false
+        default: "both"
 permissions:
   contents: read
 concurrency:
@@ -16,7 +25,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   health:
-    if: github.event.schedule == '3 */2 * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '3 */2 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode != 'report')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -38,7 +47,7 @@ jobs:
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
   report:
-    if: github.event.schedule == '7 5 * * 1' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '7 5 * * 1' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode != 'health')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

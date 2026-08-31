@@ -7,6 +7,15 @@ on:
     - cron: "35 1 * * *"    # 07:00 IST — morning: how did you sleep?
     - cron: "21 16 * * *"    # 21:30 IST — evening: productivity + mood (before the 22:00 journal prompt)
   workflow_dispatch:
+    inputs:
+      mode:
+        # ONE job here, not two — the mode is an env expression, not an `if:`. A dispatch has no
+        # github.event.schedule, so it always fell through to "morning": rescuing a dropped
+        # EVENING check-in would have asked "how did you sleep?" at 10pm. Blank keeps a bare
+        # dispatch and every scheduled run behaving exactly as before.
+        description: "morning or evening (blank = follow the schedule)"
+        required: false
+        default: ""
 permissions:
   contents: read
 concurrency:
@@ -25,8 +34,11 @@ jobs:
         env:
           AGENT_NAME: habits
           # github.event.schedule holds the cron string that triggered this run; a manual dispatch
-          # has none, so it falls through to the morning prompt.
-          MODE: ${{ github.event.schedule == '21 16 * * *' && 'evening' || 'morning' }}
+          # has none, so it falls through to the morning prompt. An explicit `mode` input wins over
+          # both — that is how the dispatcher rescues a dropped evening check-in. An empty string
+          # is falsy in GitHub expressions and github.event.inputs is null on a schedule event, so
+          # a bare dispatch and every scheduled run are unaffected.
+          MODE: ${{ github.event.inputs.mode || (github.event.schedule == '21 16 * * *' && 'evening' || 'morning') }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

@@ -7,6 +7,14 @@ on:
     - cron: "23 6 * * *"   # daily ~11:53 IST — rolling page scan
     - cron: "51 11 * * 1"   # Mon ~17:21 IST — weekly report
   workflow_dispatch:
+    inputs:
+      mode:
+        # Lets a dispatch name ONE job. The scan is the fleet's heaviest LLM consumer
+        # (BRAND_AUDITS_PER_DAY back-to-back), so firing it unintentionally is expensive.
+        # Default "both" keeps a bare dispatch (/brand, the dashboard Run button) unchanged.
+        description: "scan, report, or both"
+        required: false
+        default: "both"
 permissions:
   contents: read
 concurrency:
@@ -14,7 +22,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   scan:
-    if: github.event.schedule == '23 6 * * *' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '23 6 * * *' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode != 'report')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -36,7 +44,7 @@ jobs:
           FIRECRAWL_API_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
   report:
-    if: github.event.schedule == '51 11 * * 1' || github.event_name == 'workflow_dispatch'
+    if: github.event.schedule == '51 11 * * 1' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode != 'scan')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
