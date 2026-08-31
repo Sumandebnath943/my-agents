@@ -18,7 +18,20 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
       - run: npm ci
+      # Run gate — has the dispatcher already covered this scheduled slot? Only `schedule`
+      # events are gated; a dispatch or a human pressing Run always proceeds. continue-on-error
+      # is REQUIRED: without it a failed gate would stop the steps below, which is fail-CLOSED.
+      - id: gate
+        continue-on-error: true
+        run: node tools/run-gate.mjs
+        env:
+          GATE_AGENT: ${{ github.workflow }}
+          GATE_EVENT: ${{ github.event_name }}
+          GATE_CRON: ${{ github.event.schedule }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       - run: node agents/15-journal/weekly.js
+        if: steps.gate.outcome == 'failure' || steps.gate.outputs.skip != 'true'
         env:
           AGENT_NAME: journal
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -33,3 +46,16 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM: ${{ secrets.RESEND_FROM }}
           MY_EMAIL: ${{ secrets.MY_EMAIL }}
+
+      # Mark the slot done only on success. An unconfirmed claim means the run failed, so the
+      # slot stays open and GitHub's later delivery is allowed through rather than skipped.
+      - name: confirm slot
+        if: always() && steps.gate.outputs.claimed == 'true' && job.status == 'success'
+        continue-on-error: true
+        run: node tools/run-gate.mjs --confirm
+        env:
+          GATE_AGENT: ${{ github.workflow }}
+          GATE_EVENT: ${{ github.event_name }}
+          GATE_CRON: ${{ github.event.schedule }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}

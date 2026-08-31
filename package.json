@@ -28,6 +28,7 @@
     "eval:job-apply": "node evals/job-apply/run.mjs",
     "eval:job-feedback": "node evals/job-feedback/run.mjs",
     "eval:job-dedupe": "node evals/job-dedupe/run.mjs",
+    "eval:slot": "node evals/slot/run.mjs",
     "eval:all": "node evals/run-all.mjs",
     "eval:finance": "echo \"Finance classifier + eval live in the agents-dashboard repo: node scripts/finance-eval.mjs\"",
     "eval:format": "node evals/format/run.mjs"
