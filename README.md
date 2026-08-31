@@ -47,13 +47,21 @@ never been throttled. **Nothing in this repo depends on it.** Every agent keeps 
 schedule, no workflow is disabled, and with the dispatcher switched off the fleet behaves exactly
 as it did before — late sometimes, but working.
 
-Two consequences worth knowing before editing a cron here:
+Since 31 August a **run gate** sits in front of every scheduled job (`tools/run-gate.mjs`): when
+GitHub delivers a run the dispatcher has already covered, the agent exits green instead of doing
+the work twice. It gates `schedule` events only — a dispatch, or a human pressing Run, always
+proceeds — and fails open on any error. It is controlled from Supabase, not from this repo, and
+does nothing at all while the dispatcher's switch is off.
+
+Three consequences worth knowing before editing a cron here:
 
 - **The dashboard keeps a hardcoded mirror of every cron** (`lib/agents-meta.js`). Change a cron
   here and you must change it there, or every next-run countdown lies silently. Run the dashboard's
   `scripts/cron-crosscheck.mjs` before committing any schedule change.
 - **Several workflows gate their jobs on `github.event.schedule == '<exact cron>'`.** Move a cron
   without moving its gate and that job silently never runs again, with no error anywhere.
+- **The run gate's slot maths is covered by `npm run eval:slot`.** A wrong slot is a silently
+  skipped run wearing a green tick, so that suite is a ship blocker, not a formality.
 
 **Model routing.** Agents call a multi-provider layer spanning Groq, Gemini, Cerebras,
 Mistral, OpenRouter and OpenAI, with automatic failover and rate-limit-aware pacing so the
