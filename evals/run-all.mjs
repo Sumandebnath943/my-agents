@@ -23,8 +23,9 @@ import { run as jobFilter } from "./job-filter/run.mjs";
 import { run as jobApply } from "./job-apply/run.mjs";
 import { run as jobFeedback } from "./job-feedback/run.mjs";
 import { run as jobDedupe } from "./job-dedupe/run.mjs";
+import { run as slot } from "./slot/run.mjs";
 
-const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, format, integrity, winners, reconcile, calendar, health, jobFilter, jobApply, jobFeedback, jobDedupe];
+const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, format, integrity, winners, reconcile, calendar, health, jobFilter, jobApply, jobFeedback, jobDedupe, slot];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];
