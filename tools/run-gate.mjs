@@ -142,6 +142,17 @@ async function main() {
 
   const line = `Skipped — already ran by ${by} at ${at}`;
 
+  // Record it for the nightly report. Without this the report can only infer skips from run
+  // history, and an inference cannot tell "the gate stopped a duplicate" from "nothing was due".
+  // Best-effort: never let bookkeeping change the gating decision.
+  try {
+    await db.from("kv").insert({
+      key: `gateskip:${new Date().toISOString().slice(0, 10)}:${AGENT}:${slotKey(slot)}`,
+      value: { agent: AGENT, cron: CRON, slot: slotKey(slot), by: held?.value?.by || "?", at: held?.value?.at, mode, run_id: RUN_ID },
+      updated_at: new Date().toISOString(),
+    });
+  } catch { /* ignore */ }
+
   if (mode === "observe") {
     summary(`👁️ **Gate (observe):** would have skipped — already ran by ${by} at ${at}. Slot \`${slotKey(slot)}\`. Running anyway.`);
     return done(false, false, `gate(observe): WOULD SKIP — ${line}`);
