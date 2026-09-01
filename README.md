@@ -63,10 +63,18 @@ Three consequences worth knowing before editing a cron here:
 - **The run gate's slot maths is covered by `npm run eval:slot`.** A wrong slot is a silently
   skipped run wearing a green tick, so that suite is a ship blocker, not a formality.
 
-**Model routing.** Agents call a multi-provider layer spanning Groq, Gemini, Cerebras,
-Mistral, OpenRouter and OpenAI, with automatic failover and rate-limit-aware pacing so the
-fleet stays inside free-tier quotas. Every call is logged with provider, latency, status and
-token counts, which feeds a weekly availability and cost report.
+**Model routing.** Agents call a multi-provider layer spanning Groq, Gemini, Mistral, Cohere,
+Cerebras, OpenRouter and OpenAI, with automatic failover so a provider outage degrades quality
+rather than stopping work. Pacing is aware that free tiers impose **two different ceilings** —
+requests per minute and tokens per minute — which differ by more than 6× between providers, so
+chain order is set from each agent's measured call sizes rather than a single rate. Providers
+that publish their remaining token window are read back after every call and held when it runs
+low. Every call is logged with provider, latency, status and token counts, feeding a weekly
+availability and cost report.
+
+`scripts/chain-crosscheck.mjs` asserts that every provider named in an agent's fallback chain
+actually has its key in that agent's workflow — a keyless provider is skipped silently by design,
+so without this a chain can quietly run shorter than it reads.
 
 **Storage.** Supabase (Postgres + pgvector) holds all agent state, telemetry, and the
 embedded document store used for retrieval.
