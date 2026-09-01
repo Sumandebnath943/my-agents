@@ -35,3 +35,8 @@ fleet-timetable.html
 # Dispatcher planning records — internal operational detail (Vercel/Supabase usage, schedules).
 # Same reason as PROJECT_BIBLE/HANDOFF/SECURITY_POSTURE: this repo is public.
 DISPATCHER_*.md
+
+# LLM routing record — provider ceilings, per-agent token loads, which providers are dead or
+# out of credit. That is a map of exactly where the fleet is fragile, plus billing state. Same
+# reason as SECURITY_POSTURE: useful to us, reconnaissance to anyone else. Stays local.
+LLM_ROUTING*.md

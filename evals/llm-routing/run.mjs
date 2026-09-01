@@ -6,13 +6,16 @@ import { runCases, isMain } from "../_lib.mjs";
 import { CHAINS, AGENT_CHAIN, chainFor, VISION_PROVIDERS } from "../../lib/routing.js";
 import { callLLM, _RPM, _OAI } from "../../lib/llm.js";
 
-const KNOWN = new Set(["openai", "gemini", "groq", "cerebras", "mistral", "openrouter"]);
+const KNOWN = new Set(["openai", "gemini", "groq", "cerebras", "mistral", "openrouter", "cohere"]);
 
 export async function run() {
   const resolve = runCases("routing · chainFor()", [
     { id: "cto->openai-first", ok: chainFor("cto").order[0] === "openai" },
     { id: "journal->groq-first", ok: chainFor("journal").order[0] === "groq" && chainFor("journal").order.includes("openai") },
-    { id: "journal-no-freetier-fallback", ok: !chainFor("journal").order.some((p) => ["cerebras", "mistral", "openrouter"].includes(p)) },
+    // `private` admits no free-tier provider — journal/finance/habits/expenses content must not
+    // reach one. Cohere is listed here too: it is free-tier, and adding it to `private` would break
+    // that promise silently, which is exactly what this case exists to prevent.
+    { id: "journal-no-freetier-fallback", ok: !chainFor("journal").order.some((p) => ["cerebras", "mistral", "openrouter", "cohere"].includes(p)) },
     { id: "briefing->openai-first", ok: chainFor("briefing").order[0] === "openai" },
     { id: "unknown->public-default", ok: chainFor("zzz").order[0] === "gemini" },
     { id: "explicit-override-wins", ok: chainFor("journal", "heavy").order[0] === "openai" },
@@ -50,7 +53,12 @@ export async function run() {
   ], (c) => ({ ok: c.ok }));
 
   // callLLM must fail cleanly (not hang / not hit network) when no keys are configured.
-  for (const p of ["OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "CEREBRAS_API_KEY", "MISTRAL_API_KEY", "OPENROUTER_API_KEY"]) delete process.env[p];
+  // ⚠️ EVERY provider key must be listed here. Miss one and this stops being an offline test: the
+  // chain reaches that provider, makes a REAL network call, succeeds, and `no-keys-throws-cleanly`
+  // fails for a reason that looks nothing like the cause. That is precisely what happened when
+  // `cohere` was added to the chains on 1 Sep 2026 — the case caught it, which is the point.
+  // Keep this in step with the keyEnv values in lib/llm.js's OAI map, plus GEMINI_API_KEY.
+  for (const p of ["OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "CEREBRAS_API_KEY", "MISTRAL_API_KEY", "OPENROUTER_API_KEY", "COHERE_API_KEY"]) delete process.env[p];
   process.env.AGENT_NAME = "cto";
   let threw = false;
   try { await callLLM("hello"); } catch { threw = true; }
