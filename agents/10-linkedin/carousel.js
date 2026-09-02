@@ -22,9 +22,12 @@
 // together:
 //   1. ONE accent colour. Lime appears on the logo, the eyebrow, the rule and the pill, and
 //      nowhere else. The moment a second colour earns a place, the accent stops meaning anything.
-//   2. A fixed frame. Header and footer sit at the same y on every slide, so only the middle
-//      changes as you swipe — which is what makes the deck feel like one object.
-//   3. Variation from typography and layout, never from palette.
+//   2. A fixed frame. Header and footer sit at the same y on every slide, and every headline starts
+//      at the same x — so only the words change as you swipe, which is what makes the deck feel
+//      like one object. This outranks rule 3; see the note on drawPoint for what happens when it
+//      does not.
+//   3. Variation from the content — headline length, whether a slide carries a supporting line —
+//      never from moving the furniture, and never from the palette.
 import PDFDocument from "pdfkit";
 import { MOON_RATIO } from "./card.js";
 
@@ -335,49 +338,43 @@ function drawHook(doc, slide, ctx) {
 }
 
 /**
- * Point slides, in two alternating treatments.
+ * Point slides. ONE composition, used for every one of them.
  *
- * Variation is the difference between a deck and a slideshow: six identically-composed slides train
- * the eye to stop reading by slide three. Both treatments use the same frame, the same type ramp and
- * the same single accent — only the emphasis moves. Chosen by index, so it stays deterministic.
+ * There were two alternating treatments — a numeral, or an accent bar with the text indented past
+ * it. It was a mistake, and an instructive one: the indent moved the left margin, so consecutive
+ * slides started their headlines at different x positions. Swiping through, the text visibly jumped
+ * sideways every other slide and the bar slide read as if it came from a different deck.
+ *
+ * That broke rule 2 at the top of this file, which the alternation was added in service of rule 3.
+ * The frame is what makes a deck read as one object, and it outranks variety: a reader swiping at
+ * speed reads a shifting margin as a mistake, not as rhythm. Real variation comes from the content
+ * — headlines of different lengths, some slides carrying a supporting line and some not — and none
+ * of that requires moving the furniture.
  */
 function drawPoint(doc, slide, ctx) {
   ground(doc, ctx.i);
   header(doc, ctx.kicker);
 
-  const variantA = slide.n % 2 === 1;
-  const left = variantA ? PAD : PAD + 36;
-  const width = variantA ? W : W - 36;
-
   const NUMERAL = 104;
   const blk = centredBlock(doc, {
-    title: slide.title, body: slide.body, left, width,
+    title: slide.title, body: slide.body, left: PAD, width: W,
     top: BODY_TOP, bottom: BODY_BOT,
     titleMax: 68, titleMin: 32,
     lead: NUMERAL,
   });
 
-  // EVERY point slide is numbered. The numeral used to belong to variant A only, so the count
-  // disappeared on alternating slides — the reader lost their place, and the deck read as if two
-  // different templates had been mixed. Numbering is information; variation is the accent bar.
+  // Every point slide is numbered. Numbering is information — a reader who cannot see the count
+  // cannot see how much is left, and drop-off is worst where that is unclear.
   //
   // Outlined rather than filled at low opacity: lime loses its identity the moment it is faded over
   // near-black and comes out a muddy olive. An outline keeps the colour at full strength while
-  // still reading as furniture rather than as a headline.
+  // still reading as furniture rather than as a second headline.
   doc.font(BOLD).fontSize(74).fillColor(THEME.brand).strokeColor(THEME.brand).lineWidth(1.4);
   faded(doc, 0.75, () => {
-    doc.text(String(slide.n).padStart(2, "0"), variantA ? PAD : left, blk.top - NUMERAL, {
+    doc.text(String(slide.n).padStart(2, "0"), PAD, blk.top - NUMERAL, {
       lineBreak: false, characterSpacing: 1, fill: false, stroke: true,
     });
   });
-
-  if (!variantA) {
-    // B keeps the accent bar as its distinguishing element, spanning the numeral and the headline
-    // so the two read as one group. Drawn after the text so its height matches what the headline
-    // actually occupied rather than a guess at it.
-    const top = blk.top - NUMERAL + 18;
-    doc.rect(PAD, top, 5, Math.max(52, blk.titleBottom - top - 8)).fill(THEME.brand);
-  }
 }
 
 /**
