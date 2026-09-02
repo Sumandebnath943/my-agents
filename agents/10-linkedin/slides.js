@@ -391,6 +391,63 @@ export function figuresIn(text) {
  *
  * @returns {Array<{slide: number, figure: string, text: string}>} empty when nothing is unsupported
  */
+/**
+ * Runs of consecutive words the post shares VERBATIM with the source article.
+ *
+ * The source-similarity gate everything else uses only ever compares against the HEADLINE — that is
+ * what the August incident was about, and it is all `pickCardLine` and `buildSlides` check. A
+ * sentence lifted from paragraph nine of the article sails past every one of them, on the post and
+ * on the slides alike. The only thing standing against it today is a prompt instruction which, for
+ * the article, actually says "every fact, number, name and quote must come from it" — an accuracy
+ * rule that if anything pulls TOWARD reusing the source's language.
+ *
+ * Eight words is the threshold. Shorter runs collide constantly on ordinary English; eight is rare
+ * enough to be worth reading, but NOT immune — a formulaic phrase like "the future of AI is not
+ * about what" can honestly appear in both the post and the article, and there is an eval asserting
+ * exactly that so nobody later "fixes" it. That possibility is the reason this only ever WARNS.
+ * Raising the threshold to silence such hits would also start missing real lifts, which is the
+ * worse trade for something whose entire output is a message a human reads.
+ *
+ * Runs are extended greedily, so a lifted sentence is reported once at full length rather than as
+ * a dozen overlapping windows.
+ *
+ * Checking the POST covers the slides too: every slide's text is a trimmed substring of the post
+ * (see traceableTo), so a verbatim run on a slide is by construction a verbatim run in the post.
+ *
+ * @param {string} text     the post body
+ * @param {string} article  the scraped article, or null when it could not be read
+ * @param {{minWords?: number}} opts
+ * @returns {Array<{words: number, text: string}>} longest-first; empty when there is nothing to say
+ */
+export function verbatimRuns(text, article, { minWords = 8 } = {}) {
+  if (!article || !text) return [];
+  const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const post = norm(text);
+  const src = norm(article);
+  if (post.length < minWords || src.length < minWords) return [];
+
+  // Index the article's n-grams once, then slide over the post. Linear in both.
+  const grams = new Map();
+  for (let i = 0; i + minWords <= src.length; i++) {
+    const key = src.slice(i, i + minWords).join(" ");
+    if (!grams.has(key)) grams.set(key, i);
+  }
+
+  const runs = [];
+  let i = 0;
+  while (i + minWords <= post.length) {
+    const key = post.slice(i, i + minWords).join(" ");
+    const at = grams.get(key);
+    if (at === undefined) { i++; continue; }
+    // Extend while both sides keep agreeing, so the whole lifted passage is reported as one hit.
+    let len = minWords;
+    while (i + len < post.length && at + len < src.length && post[i + len] === src[at + len]) len++;
+    runs.push({ words: len, text: post.slice(i, i + len).join(" ") });
+    i += len;
+  }
+  return runs.sort((a, b) => b.words - a.words);
+}
+
 export function unsupportedFigures(slides, article) {
   if (!article) return [];
   const hay = squash(article);

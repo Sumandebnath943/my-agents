@@ -281,6 +281,35 @@ async function sendDraft(id, row, article = null) {
     { html: true, buttons }
   );
 
+  // ---- Verbatim check against the source article -------------------------------------------
+  // Deliberately OUTSIDE the carousel branch: this protects the POST, which publishes whether or
+  // not there is a deck. Every other gate in this pipeline compares against the source HEADLINE
+  // only, so a sentence lifted from the middle of the article passes all of them.
+  //
+  // WARNS, never blocks. A long shared run can legitimately be a product name, a direct quote, or a
+  // phrase there is only one sensible way to write — and the approval step exists precisely so a
+  // human makes that call. Silently deleting the post would be the wrong trade.
+  if (article) {
+    try {
+      const { verbatimRuns } = await import("./slides.js");
+      const runs = verbatimRuns(stripMarkdown(row.post), article);
+      if (runs.length) {
+        const worst = runs.slice(0, 3).map((r) => `• ${r.words} words: "${tgEscape(r.text)}"`).join("\n");
+        await notifyTelegram(
+          `📄 <b>Verbatim overlap with the source</b> — ${runs.length} passage(s) copied word-for-word from the article:\n\n${worst}\n\n<i>Not necessarily wrong (a quote, a product name), but it is your name on it. Edit or regenerate if it reads as lifted.</i>`,
+          { html: true }
+        );
+      }
+      console.log(runs.length ? `verbatim: ${runs.length} run(s), longest ${runs[0].words} words` : "verbatim: no overlap with the article");
+    } catch (e) {
+      console.error("verbatim check failed (draft unaffected):", e.message);
+    }
+  } else {
+    // readArticle returns null for hosts that defeat the scraper. Say so rather than imply a clean
+    // result — "not checked" and "checked, clean" must never look the same.
+    console.log("verbatim: article unavailable, not checked");
+  }
+
   // Show the media BEFORE approval — you should see what will carry your name, not discover it on
   // the feed. Best-effort throughout: a preview failure must never block a draft.
   //

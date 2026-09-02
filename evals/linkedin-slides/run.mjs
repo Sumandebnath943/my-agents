@@ -10,7 +10,7 @@
 //   4. DETERMINISM — the draft agent previews the deck and the publish agent rebuilds it. If the
 //      same post can produce two different outlines, you approve one carousel and publish another.
 import { runCases, isMain } from "../_lib.mjs";
-import { buildSlides, segments, compress, clampChars, openingLine, documentTitle, brandSlide, traceableTo, unsupportedFigures } from "../../agents/10-linkedin/slides.js";
+import { buildSlides, segments, compress, clampChars, openingLine, documentTitle, brandSlide, traceableTo, unsupportedFigures, verbatimRuns } from "../../agents/10-linkedin/slides.js";
 import { renderCarousel, hookPng, pdfSafe } from "../../agents/10-linkedin/carousel.js";
 import { readFileSync } from "node:fs";
 
@@ -270,6 +270,62 @@ export async function run() {
         return bad.some((b) => b.figure.includes("87"))
           ? { ok: true }
           : { ok: false, note: "an 87% that appears nowhere in the article was not flagged" };
+      },
+    },
+    {
+      id: "verbatim-lift-is-caught",
+      check: () => {
+        const article = "Regulators said the company would be required to disclose every automated decision affecting a patient within thirty days of the request being filed.";
+        const post = "Compliance is architecture.\n\nThe company would be required to disclose every automated decision affecting a patient within thirty days.\n\nThat is the part teams underestimate.";
+        const runs = verbatimRuns(post, article);
+        if (!runs.length) return { ok: false, note: "a lifted sentence went undetected" };
+        if (runs[0].words < 12) return { ok: false, note: `run not extended to full length (${runs[0].words} words)` };
+        return { ok: true };
+      },
+    },
+    {
+      id: "paraphrase-is-not-flagged",
+      check: () => {
+        const article = "Regulators said the company would be required to disclose every automated decision affecting a patient within thirty days of the request being filed.";
+        const post = "Compliance is architecture.\n\nEvery automated call touching a patient now has to be explainable inside a month.\n\nThat is the part teams underestimate.";
+        const runs = verbatimRuns(post, article);
+        return runs.length ? { ok: false, note: `flagged a genuine paraphrase: "${runs[0].text}"` } : { ok: true };
+      },
+    },
+    {
+      id: "same-topic-different-words-does-not-collide",
+      check: () => {
+        // The contract that matters: writing about the same subject in your own words must not
+        // trip the check, or the warning becomes noise you learn to ignore.
+        const article = "Analysts expect model providers to compete on orchestration rather than raw capability as the hardware advantage narrows over the next two years.";
+        const post = "The advantage is moving from the chips to how you schedule work across them.\n\nCapability is table stakes now.\n\nEvery team learns this the same expensive way.";
+        const runs = verbatimRuns(post, article);
+        return runs.length ? { ok: false, note: `collided on unrelated phrasing: "${runs[0].text}"` } : { ok: true };
+      },
+    },
+    {
+      id: "stock-phrasing-can-trip-it-and-that-is-ok",
+      check: () => {
+        // KNOWN BEHAVIOUR, asserted so nobody "fixes" it later. Eight words of formulaic English
+        // ("the future of AI is not about what") CAN appear in both the post and the article
+        // honestly. This is exactly why the check warns instead of blocking: a human reads the
+        // passage and decides. Raising the threshold to silence it would also start missing real
+        // lifts, which is the worse trade for something that only ever prints a message.
+        const article = "The future of AI is not about what the models can do on their own today.";
+        const post = "The future of AI is not about what agents can do.\n\nIt is about control.\n\nEvery team learns this the same expensive way.";
+        const runs = verbatimRuns(post, article);
+        return runs.length === 1 && runs[0].words === 8
+          ? { ok: true }
+          : { ok: false, note: `expected one 8-word hit, got ${JSON.stringify(runs)}` };
+      },
+    },
+    {
+      id: "no-article-means-no-verdict",
+      check: () => {
+        const post = "Compliance is architecture.\n\nThe company would be required to disclose every automated decision.\n\nThat is the part teams underestimate.";
+        return verbatimRuns(post, null).length === 0
+          ? { ok: true }
+          : { ok: false, note: "claimed a verdict with no article to check against" };
       },
     },
     {
