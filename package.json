@@ -13,6 +13,7 @@
     "eval:linkedin": "node evals/linkedin/run.mjs",
     "eval:linkedin-slides": "node evals/linkedin-slides/run.mjs",
     "audit:slides": "node scripts/linkedin-slide-audit.mjs",
+    "audit:projects": "node scripts/linkedin-project-audit.mjs",
     "eval:critique": "node evals/critique/run.mjs",
     "eval:mcp": "node evals/mcp/run.mjs",
     "eval:tier": "node evals/tier/run.mjs",

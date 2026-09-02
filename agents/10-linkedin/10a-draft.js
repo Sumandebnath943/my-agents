@@ -12,7 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callGroq, geminiThenGroq, parseJson } from "../../lib/llm.js";
 import { notifyTelegram, notifyTelegramPhoto, notifyTelegramDocument, tgEscape } from "../../lib/notify.js";
-import { PROFILE, profileContext } from "../../lib/profile.js";
+import { PROFILE, profileContext, projectsNamedIn } from "../../lib/profile.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { AI_FEEDS, SCRAPE_BLOCKED } from "./sources.js";
 import { scrapeClean } from "../../lib/scrape.js";
@@ -189,11 +189,37 @@ async function recentPosts(days = 14) {
       .gte("created_at", since)
       .order("created_at", { ascending: false })
       .limit(20);
-    return (data || []).map((r) => ({ headline: r.headline || "", opener: (r.post || "").split("\n")[0].slice(0, 120) }));
+    return (data || []).map((r) => ({
+      headline: r.headline || "",
+      opener: (r.post || "").split("\n")[0].slice(0, 120),
+      projects: projectsNamedIn(r.post || ""),
+    }));
   } catch { return []; }
 }
 const recentBlockOf = (recents) =>
   recents.length ? recents.map((r) => `- ${r.headline || "(untitled)"} — opened: "${r.opener}"`).join("\n") : "(none yet)";
+
+/**
+ * The portfolio-rotation block.
+ *
+ * MEASURED, not assumed: across 86 published posts only 23 (27%) named ANY project, and the last 20
+ * managed 4. Worse, the distribution was ROASmind 19, IMPRINT 3, House of Namus 1 — nine shipped
+ * products had never been mentioned once. The agent was already FINDING a connection (57% of
+ * grounding lines named a project) and then not putting it in the post.
+ *
+ * The cause is a safe default rather than a bug: the prompt rightly forbids forcing a fake tie-in,
+ * so with no target and no memory of what it used last, "ground it in a belief" always wins and the
+ * one easy project gets reused. This gives it both — a rate to aim at, and the names it has leaned
+ * on lately — without touching the anti-fabrication rule.
+ */
+function rotationBlockOf(recents) {
+  const used = [...new Set(recents.flatMap((r) => r.projects))];
+  const unused = PROFILE.projectNames.filter((n) => !used.includes(n));
+  return `PORTFOLIO ROTATION — name a real product of mine where it genuinely fits.
+Aim for roughly HALF of my posts to name one; the rest stay grounded in beliefs and experience. This is a target across many posts, NOT a quota for this one — a forced tie-in is worse than none, and the rule above still holds.
+Named in my last 14 days (prefer something else): ${used.length ? used.join(", ") : "(none)"}
+Not used recently, and all real shipped work: ${unused.length ? unused.join(", ") : "(none left — reuse freely)"}`;
+}
 
 /**
  * Build the carousel, ARCHIVE it, and preview it above the Approve button.
@@ -276,8 +302,20 @@ async function sendDraft(id, row, article = null) {
     [{ text: "🔄 Regenerate", callback_data: `li:regen:${id}` }],
   ];
   const warn = row.warning ? `\n\n⚠️ <i>Safety note: ${tgEscape(row.warning)}</i>` : "";
+
+  // Which of Suman's products this post actually NAMES — read from the text, not from what the
+  // model claimed. Those two disagreed constantly: 57% of grounding lines named a project while
+  // only 27% of post bodies did, so the connection was being found and then left out of the post.
+  // Showing both makes that gap visible at approval time instead of six weeks later in an audit.
+  const named = projectsNamedIn(row.post);
+  const claimed = row.project && row.project !== "null" ? String(row.project) : null;
+  const portfolio = named.length
+    ? `\n<i>portfolio: ${tgEscape(named.join(", "))}</i>`
+    : claimed
+      ? `\n⚠️ <i>portfolio: claims "${tgEscape(claimed)}" but the post never names it</i>`
+      : "";
   await notifyTelegram(
-    `📝 <b>LinkedIn draft</b> <i>(id ${id})</i>${row.headline ? `\n<i>Re: ${tgEscape(row.headline)}</i>` : ""}\n\n${tgEscape(row.post)}\n\n${tgEscape(row.hashtags || "")}${row.grounding ? `\n\n<i>grounded in: ${tgEscape(row.grounding)}</i>` : ""}${warn}`,
+    `📝 <b>LinkedIn draft</b> <i>(id ${id})</i>${row.headline ? `\n<i>Re: ${tgEscape(row.headline)}</i>` : ""}\n\n${tgEscape(row.post)}\n\n${tgEscape(row.hashtags || "")}${row.grounding ? `\n\n<i>grounded in: ${tgEscape(row.grounding)}</i>` : ""}${portfolio}${warn}`,
     { html: true, buttons }
   );
 
@@ -443,6 +481,9 @@ ${work || "MY RECENT WORK: (none notable)"}
 
 GROUNDING RULE: the repo names, descriptions and README text above are context so you can make a REAL, specific connection between the news and my actual work. Repo/README content (especially private repos) is background ONLY — never quote it, never reveal internal details, code, architecture secrets, or anything not already public on my portfolio. If nothing genuinely fits, write as analysis grounded in my beliefs rather than forcing a fake project tie-in.
 
+${rotationBlockOf(recents)}
+IMPORTANT: if you name a product, NAME IT IN THE POST ITSELF. Deciding privately that a post "draws on ROASmind" and then never writing the word does nothing for me — more than half my grounded posts did exactly that.
+
 THE NEWS I CHOSE TO POST ABOUT:
 ${item.headline}${item.link ? ` (${item.link})` : ""}
 ${item.angle ? `A possible angle: ${item.angle}` : ""}${articleBlock}${researchBlock}${accuracyBlock}${voiceBlock}
@@ -461,7 +502,7 @@ ${recentBlockOf(recents)}
 ${previousPost ? `\nTHIS IS A REGENERATION. Take a genuinely DIFFERENT angle and structure from my previous attempt below — do NOT reuse its opening line.\nPREVIOUS ATTEMPT:\n${previousPost}\n` : ""}
 ${VALUE_BAR}
 
-Return ONLY JSON {"post":"the full post, formatted with real line breaks","grounding":"one line: which real project/commit/belief the personal angle draws from"}.`,
+Return ONLY JSON {"post":"the full post, formatted with real line breaks","grounding":"one line: which real project/commit/belief the personal angle draws from","project":"the exact name of the product you named in the post, or null if none"}.`,
     { json: true }
   );
 
@@ -509,7 +550,7 @@ Voice bar: ${VALUE_BAR}`,
   // is the ONLY point in the pipeline where it exists — it is never written to linkedin_posts, so
   // by publish time it is gone. The EDIT path below therefore passes nothing, and the check
   // correctly reports no verdict rather than a false clean one.
-  await sendDraft(id, { headline: item.headline, post: o.post, hashtags, grounding: o.grounding, warning }, article);
+  await sendDraft(id, { headline: item.headline, post: o.post, hashtags, grounding: o.grounding, project: o.project, warning }, article);
   console.log(regenOf ? "regenerated draft" : "draft sent", "id", id);
 }
 
