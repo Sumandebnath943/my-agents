@@ -210,7 +210,7 @@ const recentBlockOf = (recents) =>
 async function previewCarousel(id, row, article) {
   try {
     const { buildSlides, documentTitle, unsupportedFigures } = await import("./slides.js");
-    const { renderCarousel } = await import("./carousel.js");
+    const { renderCarousel, hookPng } = await import("./carousel.js");
 
     const post = stripMarkdown(row.post);
     const deck = buildSlides(post, { sourceHeadline: row.headline || "" });
@@ -227,6 +227,26 @@ async function previewCarousel(id, row, article) {
     await db.storage.createBucket("linkedin", { public: false }).catch(() => {});
     const up = await db.storage.from("linkedin").upload(`carousel-${id}.pdf`, pdf, { contentType: "application/pdf", upsert: true });
     if (up.error) throw new Error(`could not archive the deck — ${up.error.message}`);
+
+    // ALSO archive a PNG at `card-<id>.png`.
+    //
+    // Bluesky and Mastodon cannot take a PDF. The dashboard's repurpose flow downloads exactly that
+    // key and attaches it (agents-dashboard lib/social/index.js), falling back to a text-only
+    // cross-post when it is absent. That archive used to happen in 10c-post.js's card branch — the
+    // branch the carousel now SKIPS, because it only runs when no media has been attached yet. So
+    // turning the carousel on silently downgraded both other platforms from image+text to text,
+    // with nothing but a log line to say so.
+    //
+    // Best-effort: a cross-posting artefact must never cost the LinkedIn deck.
+    try {
+      const png = await hookPng(deck.slides);
+      if (png) {
+        const cardUp = await db.storage.from("linkedin").upload(`card-${id}.png`, png, { contentType: "image/png", upsert: true });
+        console.log(cardUp.error ? `carousel: cross-post PNG failed — ${cardUp.error.message}` : `carousel: cross-post PNG archived as linkedin/card-${id}.png`);
+      }
+    } catch (e) {
+      console.log("carousel: cross-post PNG failed —", e.message);
+    }
 
     // Figures that are not in the article. NOT a block: the same figure is already in the post
     // body and would publish as text regardless, so removing the carousel would hide the problem

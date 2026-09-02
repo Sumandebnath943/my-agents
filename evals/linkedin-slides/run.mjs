@@ -613,6 +613,36 @@ export async function run() {
   const wf = (f) => readFileSync(new URL(`../../.github/workflows/${f}`, import.meta.url), "utf8");
   const flagIn = (src, name) => (src.match(new RegExp(`^\\s*${name}:\\s*"?([01])"?\\s*$`, "m")) || [])[1] ?? null;
 
+  // ---- The cross-post artefact ---------------------------------------------------------------
+  // Bluesky and Mastodon cannot take a PDF. The dashboard's repurpose flow downloads
+  // `linkedin/card-<id>.png` and attaches it, silently cross-posting TEXT ONLY when it is absent.
+  // That archive used to happen in 10c-post.js's card branch — the branch the carousel skips — so
+  // turning the carousel on downgraded both other platforms with nothing but a log line to say so.
+  // hookPng() existed for exactly this and was simply never called; a unit test of the function
+  // passed the whole time. This asserts the WIRING, which is what actually broke.
+  const r11 = runCases("linkedin-slides · carousel still feeds the cross-post path", [
+    {
+      id: "draft-archives-a-cross-post-png",
+      check: () => {
+        const src = readFileSync(new URL("../../agents/10-linkedin/10a-draft.js", import.meta.url), "utf8");
+        if (!/carousel-\$\{id\}\.pdf/.test(src)) return { ok: true, note: "carousel not wired in here (warn)" };
+        if (!/card-\$\{id\}\.png/.test(src)) {
+          return { ok: false, note: "the deck is archived but no cross-post PNG is — Bluesky and Mastodon will post text only" };
+        }
+        if (!/hookPng/.test(src)) return { ok: false, note: "card-<id>.png is written without hookPng — what is in it?" };
+        return { ok: true };
+      },
+    },
+    {
+      id: "hook-png-is-a-real-image",
+      check: () => {
+        if (!hookImage) return { ok: false, note: "no PNG produced for the hook slide" };
+        if (hookImage.length < 5000) return { ok: false, note: `suspiciously small: ${hookImage.length} bytes` };
+        return { ok: true };
+      },
+    },
+  ], (c) => c.check());
+
   const r10 = runCases("linkedin-slides · media flags match across both workflows", [
     { id: "LINKEDIN_POST_CAROUSEL" },
     { id: "LINKEDIN_POST_IMAGE" },
@@ -624,7 +654,7 @@ export async function run() {
     return { ok: true };
   });
 
-  return [r1, r2, r3, r4, r5, r5b, r5c, r6, r7, r7b, r8, r8b, r8c, r9, r10];
+  return [r1, r2, r3, r4, r5, r5b, r5c, r6, r7, r7b, r8, r8b, r8c, r9, r10, r11];
 }
 
 if (isMain(import.meta.url)) {
