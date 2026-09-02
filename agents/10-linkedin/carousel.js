@@ -104,10 +104,15 @@ function drawPoint(doc, slide) {
     .text(slide.title, PAD, top, { width: W, lineGap: size * 0.2 });
 
   if (slide.body) {
+    // Measured against the space the TITLE actually left, not a guess. The title shrinks to fit but
+    // still wraps to a variable number of lines, so a fixed body size could run past the rule on a
+    // slide with a long claim and a long supporting line. Both now shrink; neither can overflow.
     doc.moveDown(0.6);
-    const y = Math.min(doc.y + 14, S - 300);
-    doc.font(FONT).fontSize(28).fillColor(BRAND.muted)
-      .text(slide.body, PAD, y, { width: W, lineGap: 8 });
+    const y = Math.min(doc.y + 14, S - 320);
+    const room = (S - 168) - y;
+    const bodySize = fitSize(doc, slide.body, { font: FONT, width: W, height: room, max: 28, min: 19 });
+    doc.font(FONT).fontSize(bodySize).fillColor(BRAND.muted)
+      .text(slide.body, PAD, y, { width: W, lineGap: bodySize * 0.28 });
   }
 
   doc.moveTo(PAD, S - 132).lineTo(S - PAD, S - 132).lineWidth(2).strokeColor(BRAND.rule).stroke();
