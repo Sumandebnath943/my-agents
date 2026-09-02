@@ -24,7 +24,12 @@ import { PROFILE } from "../../lib/profile.js";
 // of pages), so these are editorial limits, not technical ones: past ~8 slides the swipe-through
 // rate falls off a cliff and the deck stops being read to the end.
 export const MAX_POINTS = 6;
-export const MIN_POINTS = 3;
+// Two points is a thin deck but still a deck: hook + 2 + brand is four slides, which reads fine as
+// a LinkedIn document and beats falling back to a single card. Measured on 85 real posts, the bar
+// of three refused 19% of them; two refuses 7%, and the decks it admits are the short posts where
+// a carousel is the format doing the most work. The floor exists to stop a one-idea post being
+// padded out, not to demand a long deck.
+export const MIN_POINTS = 2;
 
 // Line markers a post uses for its own list items. Same set card.js strips, kept in sync
 // deliberately: a marker that one module treats as content and the other as decoration produces
@@ -33,6 +38,13 @@ const MARKER = /^[\s]*(?:[0-9]{1,2}[.)]|[0-9]️?⃣|[•\-→*])\s*/;
 
 // Lines that are never slide content: hashtag blocks, the agent signature, bare links, attribution.
 const JUNK = /^#|^🤖|^via\s|^https?:\/\//i;
+
+/**
+ * Capitalise a supporting line. When it is the tail of a split claim it starts mid-sentence, and a
+ * lowercase opener under a headline reads as a fragment someone forgot to finish. Case is the only
+ * thing changed — the words stay Suman's, so the line still traces back to the post.
+ */
+const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 
 /** Character-budget trim. Ellipsises only when it actually overflows. */
 export function clampChars(text, max) {
@@ -81,9 +93,13 @@ export function segments(post) {
 
   // Paragraph mode. Rebuild blank-line groups from the ORIGINAL text: cleanLines drops empty lines,
   // which is exactly the separator we need here.
+  //
+  // Internal line breaks are PRESERVED (joined with "\n", not " "), because inside one paragraph
+  // they mark a heading and its detail. Flattening them produced "…allocation rule Use a priority
+  // queue…" — two sentences fused with no punctuation between them. compress() reads the newline.
   const paras = String(post || "")
     .split(/\n\s*\n/)
-    .map((p) => p.split("\n").map((l) => l.trim().replace(MARKER, "")).filter((l) => l && !JUNK.test(l)).join(" ").trim())
+    .map((p) => p.split("\n").map((l) => l.trim().replace(MARKER, "")).filter((l) => l && !JUNK.test(l)).join("\n").trim())
     .filter(Boolean);
   if (paras.length >= 3) return paras;
 
@@ -139,24 +155,56 @@ export function stripPreamble(s) {
   return out[0].toUpperCase() + out.slice(1);
 }
 
-export function compress(segment, { titleMax = 74, bodyMax = 180 } = {}) {
+/**
+ * A segment that only introduces the next one: "Here's what I mean:", "Here's the one practice that
+ * saved my last ten AI products:". It carries no claim, and as a slide it is a dead swipe.
+ *
+ * Detected by a TRAILING colon, not a colon anywhere: "Nvidia's evolution is a call to action for
+ * all AI builders: focus on the systems" is a claim with an elaboration and must survive.
+ */
+export function isConnector(s) {
+  const t = String(s || "").trim();
+  return /:$/.test(t) || /^(?:here'?s|so,? here|let me explain|the result\?|and here'?s)\b/i.test(t) && t.length < 60;
+}
+
+export function compress(segment, { titleMax = 140, bodyMax = 200 } = {}) {
   const s = stripPreamble(String(segment || "").trim());
   if (!s) return { title: "", body: "" };
 
   // titleMax is the size a claim WANTS to be, not a hard edge. The renderer shrinks text to fit
-  // (pdfkit measures exactly, unlike the card's SVG estimate), so a slightly long claim costs a
-  // couple of points of type — while forcing the break costs either a lost word or an absurd
-  // one-word body. Past HARD the line stops being a claim and gets trimmed.
-  const HARD = titleMax + 26;
+  // (pdfkit measures exactly, unlike the card's SVG estimate), so a long claim costs a couple of
+  // points of type — while forcing a break costs the claim itself. Measured against 85 real posts:
+  // Suman's sentences run 90-140 characters and are already slide-shaped, so at the old budget of
+  // 74 almost every one of them got cut. Past HARD the line stops being a claim and gets trimmed.
+  const HARD = titleMax + 30;
   const MIN_BODY = 15;                  // shorter than this, a "body" is an orphan, not a sentence
 
-  const parts = sentences(s);
+  // An internal line break inside one paragraph is the author writing a heading and its detail —
+  // "Orchestrate AI workloads with a simple allocation rule" / "Use a priority queue that…". That
+  // is already the title/body shape, so honour it before anything else. Joining those lines with a
+  // space produced "…allocation rule Use a priority queue…", a sentence with no punctuation in it.
+  const lines = s.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length > 1 && lines[0].length <= HARD) {
+    return {
+      title: clampChars(lines[0], HARD),
+      body: capitalise(clampChars(lines.slice(1).join(" "), bodyMax)),
+    };
+  }
+
+  const parts = sentences(lines.join(" "));
   let title = parts[0] || s;
   let rest = parts.slice(1).join(" ").trim();
 
   if (title.length > titleMax) {
-    // Look for a break far enough in to be a real clause boundary, not a stray comma at word three.
-    const m = [...title.matchAll(/\s+[—–-]\s+|:\s+|,\s+/g)].find((x) => x.index > titleMax * 0.4 && x.index <= titleMax);
+    // Break on an em-dash or a colon only — NEVER a comma.
+    //
+    // The comma was the single largest source of bad slides. Suman writes "If you want your agents
+    // to grow, start by wiring them into the existing stack" and "By routing every recommendation
+    // through that API, we cut launch time from hours to minutes" — subordinate clause first, claim
+    // second. Breaking at that comma put the SETUP in 60pt type and demoted the claim to the
+    // supporting line. Across 85 real posts that pattern alone accounted for 19 broken headlines.
+    // An em-dash or colon reliably separates a claim from its elaboration; a comma does not.
+    const m = [...title.matchAll(/\s+[—–]\s+|:\s+/g)].find((x) => x.index > titleMax * 0.35 && x.index <= titleMax);
     if (m) {
       rest = `${title.slice(m.index + m[0].length).trim()} ${rest}`.trim();
       title = title.slice(0, m.index).trim();
@@ -176,14 +224,7 @@ export function compress(segment, { titleMax = 74, bodyMax = 180 } = {}) {
     }
   }
 
-  // Capitalise the supporting line. When it is the tail of a split claim it starts mid-sentence
-  // ("and that is exactly why…"), and a lowercase opener under a headline reads as a fragment
-  // someone forgot to finish. Case is the only thing changed — the words stay Suman's.
-  const body = clampChars(rest, bodyMax);
-  return {
-    title: clampChars(title, HARD),
-    body: body ? body[0].toUpperCase() + body.slice(1) : "",
-  };
+  return { title: clampChars(title, HARD), body: capitalise(clampChars(rest, bodyMax)) };
 }
 
 /**
@@ -230,21 +271,30 @@ export function buildSlides(post, { sourceHeadline = "", maxPoints = MAX_POINTS,
   // re-written, so slide one and the first line of the post agree with each other. If the opener
   // itself restates the source, fall through to the segments in order rather than abandoning: the
   // gate should cost you a line, not the whole carousel.
-  const hookCandidates = [openingLine(post), ...segs].filter(Boolean);
+  const hookCandidates = [openingLine(post), ...segs].filter((s) => s && !isConnector(s));
   const hookSeg = hookCandidates.find((s) => sim(s) <= maxSim);
   if (!hookSeg) {
     return { ok: false, slides: [], dropped: segs.map((s) => ({ text: s, similarity: Number(sim(s).toFixed(2)) })), reason: "every line restates the source headline" };
   }
-  const hook = compress(hookSeg, { titleMax: 90, bodyMax: 0 });
+  // The hook gets the most generous budget in the deck and NO body. bodyMax: 0 used to mean
+  // "discard everything after the split", so an opener like "I've watched enterprises rush to
+  // launch AI agents, only to hit a wall of hidden complexity" shipped as its first half and the
+  // payload was deleted. At 150 characters a real opener fits whole, which is the actual fix.
+  const hook = compress(hookSeg, { titleMax: 150, bodyMax: 0 });
 
   const points = [];
   for (const seg of segs) {
     if (seg === hookSeg) continue;            // never repeat the hook as a point
     if (points.length >= maxPoints) break;
+    // A lead-in is not a point. "Here's what I mean:" as a full slide is a dead swipe, and across
+    // 85 real posts these accounted for 14 of them.
+    if (isConnector(seg)) continue;
     const score = sim(seg);
     if (score > maxSim) { dropped.push({ text: seg, similarity: Number(score.toFixed(2)) }); continue; }
     const { title, body } = compress(seg);
-    if (title.length < 12) continue;          // a fragment is not a point
+    // A short title is fine when it has a body — "Semantic caching." over its explanation is a
+    // deliberate heading, not a fragment. A short title with nothing under it is a fragment.
+    if (title.length < 12 || (title.length < 25 && !body)) continue;
     points.push({ kind: "point", title, body });
   }
 

@@ -53,6 +53,41 @@ const FONT = "Helvetica", BOLD = "Helvetica-Bold";
 
 const W = SLIDE_SIZE - PAD * 2;
 
+// Characters WinAnsi CAN encode beyond Latin-1. Anything above U+00FF that is not in here has no
+// glyph in pdfkit's built-in Helvetica and is dropped silently at render time.
+const WINANSI_EXTRA = new Set([..."€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"]);
+
+// Typographic characters that LOOK like ASCII but are not encodable, mapped to what they mean.
+const SUBSTITUTE = {
+  "‐": "-", "‑": "-", "‒": "-",          // hyphen, NON-BREAKING hyphen, figure dash
+  "―": "—", "′": "'", "″": '"',
+  " ": " ", " ": " ", " ": " ", " ": " ",
+  "​": "", "‌": "", "‍": "", "﻿": "",
+  " ": " ", " ": " ",
+};
+
+/**
+ * Make a string safe for pdfkit's built-in Helvetica.
+ *
+ * Suman's posts are full of NON-BREAKING hyphens (U+2011) — "real‑time", "built‑in", "go‑to" — which
+ * WinAnsi cannot encode. pdfkit does not substitute or warn; it emits nothing, so a real slide read
+ * "you get real  time visibility and a built  in audit trail" with holes where the hyphens should
+ * be. Every string drawn on a slide goes through here.
+ *
+ * Fixing this at render time rather than in slides.js is deliberate: the outline feeds the LinkedIn
+ * document title too, and that field is UTF-8 and should keep the author's real characters.
+ */
+export function pdfSafe(text) {
+  let out = "";
+  for (const ch of String(text ?? "")) {
+    if (ch in SUBSTITUTE) { out += SUBSTITUTE[ch]; continue; }
+    const code = ch.codePointAt(0);
+    if (code <= 0xff || WINANSI_EXTRA.has(ch)) out += ch;
+    // Anything else (emoji, CJK, rare punctuation) has no glyph and would render as a hole.
+  }
+  return out;
+}
+
 // ---- Primitives ------------------------------------------------------------------------------
 
 /** Run `fn` at a given alpha without leaking the alpha into everything drawn afterwards. */
@@ -386,8 +421,19 @@ const DRAW = { hook: drawHook, point: drawPoint, brand: drawBrand };
  * @returns {Promise<Buffer>}
  */
 export function renderCarousel(slides, { title = "", kicker = "AI, in practice", compress = true } = {}) {
+  // eslint-disable-next-line no-param-reassign -- sanitised in place below, see the note there
   return new Promise((resolve, reject) => {
     if (!Array.isArray(slides) || !slides.length) return reject(new Error("no slides to render"));
+
+    // Sanitise ONCE, here, rather than at each draw call. Every later measurement (fitSize,
+    // heightOfString, widthOfString) then measures exactly the string that gets drawn — sanitising
+    // at draw time would size the type for one string and render another.
+    slides = slides.map((s) => ({
+      ...s,
+      title: pdfSafe(s.title), body: pdfSafe(s.body),
+      name: pdfSafe(s.name), site: pdfSafe(s.site), descriptor: pdfSafe(s.descriptor),
+    }));
+    kicker = pdfSafe(kicker);
 
     const brand = slides.find((s) => s.kind === "brand") || {};
     const doc = new PDFDocument({

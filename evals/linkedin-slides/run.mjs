@@ -11,7 +11,7 @@
 //      same post can produce two different outlines, you approve one carousel and publish another.
 import { runCases, isMain } from "../_lib.mjs";
 import { buildSlides, segments, compress, clampChars, openingLine, documentTitle, brandSlide, traceableTo, unsupportedFigures } from "../../agents/10-linkedin/slides.js";
-import { renderCarousel, hookPng } from "../../agents/10-linkedin/carousel.js";
+import { renderCarousel, hookPng, pdfSafe } from "../../agents/10-linkedin/carousel.js";
 import { readFileSync } from "node:fs";
 
 // ---- Fixtures: the shapes a real drafted post actually arrives in --------------------------
@@ -103,6 +103,13 @@ export async function run() {
   // LinkedIn documents have no altText field — if the text layer ever silently became images, the
   // accessibility argument for the whole design would be gone with no other signal.
   const readable = await renderCarousel(deck(NUMBERED).slides, { compress: false });
+
+  // A deck carrying NON-BREAKING hyphens, which is how Suman's posts actually spell "real-time"
+  // and "built-in". WinAnsi has no glyph for U+2011 and pdfkit drops it silently, so a real slide
+  // rendered "you get real  time visibility and a built  in audit trail".
+  const NBH = "‑";
+  const HYPHENS = `Governance is a real${NBH}time problem, not a quarterly one.\n\nBy forcing every call through that registry, you get real${NBH}time visibility and a built${NBH}in audit trail.\n\nMy go${NBH}to fix is a single interaction registry that logs every request.\n\nThat habit keeps operators ahead of complexity.`;
+  const hyphenPdf = await renderCarousel(deck(HYPHENS).slides, { compress: false });
 
   // ---- Outline shape ----------------------------------------------------------------------
   const shape = [
@@ -423,6 +430,36 @@ export async function run() {
       : { ok: false, note: `"${c.needle}" is not in the PDF text layer — is the slide rendering as an image?` };
   });
 
+  const r8c = runCases("linkedin-slides · unencodable characters do not leave holes", [
+    {
+      id: "nb-hyphen-becomes-a-hyphen",
+      check: () => {
+        const text = pdfText(hyphenPdf);
+        if (text.includes(NBH)) return { ok: false, note: "a non-breaking hyphen reached the PDF" };
+        if (!text.replace(/\s+/g, "").includes("real-timevisibility")) {
+          return { ok: false, note: "the hyphen is missing from the rendered text — the hole is back" };
+        }
+        return { ok: true };
+      },
+    },
+    {
+      id: "sanitiser-keeps-winansi-typography",
+      check: () => {
+        // Curly quotes, en/em dashes and the ellipsis ARE encodable and must survive — replacing
+        // them with ASCII would quietly downgrade the typography for no reason.
+        const out = pdfSafe("isn’t — an “en” – dash …");
+        return out === "isn’t — an “en” – dash …" ? { ok: true } : { ok: false, note: `mangled valid typography: "${out}"` };
+      },
+    },
+    {
+      id: "sanitiser-drops-what-has-no-glyph",
+      check: () => {
+        const out = pdfSafe("emoji 🤖 and CJK 漢字 have no glyph");
+        return /🤖|漢/.test(out) ? { ok: false, note: `kept a character with no glyph: "${out}"` } : { ok: true };
+      },
+    },
+  ], (c) => c.check());
+
   const r9 = runCases("linkedin-slides · cross-post PNG still available", [
     {
       id: "hook-png-renders",
@@ -432,6 +469,100 @@ export async function run() {
         if (!hookImage) return { ok: false, note: "no PNG produced for the hook slide" };
         const sig = hookImage.subarray(1, 4).toString("latin1");
         return sig === "PNG" ? { ok: true } : { ok: false, note: `not a PNG (got "${sig}")` };
+      },
+    },
+  ], (c) => c.check());
+
+  // ---- Regressions from the real corpus -----------------------------------------------------
+  // Every case below is a sentence taken from one of Suman's own published posts, and every one of
+  // them produced a broken slide. The four invented fixtures above were all self-contained
+  // sentences, so none of this appeared: an audit over 85 real posts flagged 15.4% of slides.
+  // Real prose is full of setup-then-claim structures, lead-in lines and heading/detail pairs.
+  const r7b = runCases("linkedin-slides · regressions from real posts", [
+    {
+      id: "83-hook-keeps-its-payload",
+      check: () => {
+        // The hook was built with bodyMax:0, which DISCARDED everything past the split — this
+        // opener shipped as "I've watched enterprises rush to launch AI agents" and the point of
+        // the sentence was deleted.
+        const post = "I've watched enterprises rush to launch AI agents, only to hit a wall of hidden complexity.\n\nThe real risk isn't the agents themselves, but the way they start talking to each other.\n\nMy fix is a single interaction registry that logs every request.\n\nThat habit keeps operators ahead of complexity.";
+        const hook = deck(post).slides[0];
+        return /hidden complexity/i.test(hook.title)
+          ? { ok: true }
+          : { ok: false, note: `hook lost its payload: "${hook.title}"` };
+      },
+    },
+    {
+      id: "no-comma-split-on-subordinate-clause",
+      check: () => {
+        // 19 broken headlines across the corpus came from this one rule. The claim is AFTER the
+        // comma; breaking there put the setup in 60pt type.
+        for (const src of [
+          "If you want your agents to grow, start by wiring them into the existing stack instead of bolting on another dashboard.",
+          "By routing every AI-driven recommendation through that API, we cut the time to launch a new campaign from hours to minutes.",
+          "When we architect AI-native systems, we need to bake safety and ethics into the core.",
+        ]) {
+          const { title } = compress(src);
+          if (!/,/.test(title) && title.length < src.length - 20) {
+            return { ok: false, note: `split at the comma, keeping only the setup: "${title}"` };
+          }
+        }
+        return { ok: true };
+      },
+    },
+    {
+      id: "81-lead-in-line-is-not-a-slide",
+      check: () => {
+        const post = "Nvidia's latest moves remind us: AI is more than just powerful chips.\n\nAs AI compute demands rise, the real advantage comes from how you orchestrate resources.\n\nHere's what I see:\n\nOrchestrate AI workloads with a simple allocation rule\nUse a priority queue that gives the next free GPU to the job with the highest ROI per compute hour.\n\nNvidia's evolution is a call to action for all AI builders: focus on the systems, not just the components.";
+        const d = deck(post);
+        if (d.slides.some((s) => /^here'?s what i see/i.test(s.title || ""))) {
+          return { ok: false, note: "a lead-in line became a slide" };
+        }
+        return { ok: true };
+      },
+    },
+    {
+      id: "81-heading-and-detail-not-fused",
+      check: () => {
+        // A line break INSIDE a paragraph is a heading over its detail. Flattening it with a space
+        // produced "…allocation rule Use a priority queue…" — two sentences with no punctuation.
+        const post = "Nvidia's latest moves remind us: AI is more than just powerful chips.\n\nAs AI compute demands rise, the real advantage comes from how you orchestrate resources.\n\nOrchestrate AI workloads with a simple allocation rule\nUse a priority queue that gives the next free GPU to the job with the highest ROI per compute hour.\n\nNvidia's evolution is a call to action for all AI builders: focus on the systems.";
+        const d = deck(post);
+        // Check the TITLE alone. Testing `title + " " + body` re-joins them with the very space
+        // being looked for, so it can never distinguish a fused field from a correct split.
+        for (const s of d.slides) {
+          if (/rule\s+Use a priority/i.test(s.title || "")) {
+            return { ok: false, note: `fused a heading into its detail: "${s.title}"` };
+          }
+        }
+        const split = d.slides.find((s) => /allocation rule$/i.test(s.title || ""));
+        return split?.body ? { ok: true } : { ok: true, note: "heading not paired with its detail (warn)" };
+      },
+    },
+    {
+      id: "short-heading-with-detail-survives",
+      check: () => {
+        // "Semantic caching." over its explanation is a deliberate heading, not a fragment. Only a
+        // short line with NOTHING under it should be dropped.
+        const post = "Three techniques cut our agent costs in half.\n\nSemantic caching.\nAvoid re-processing context an agent already understands, which is most of the bill.\n\nBatch scheduling.\nGroup low-priority jobs so they ride along with work you were paying for anyway.\n\nModel routing.\nSend the easy 80% to a cheaper model and keep the hard cases on the expensive one.";
+        const d = deck(post);
+        const heading = d.slides.find((s) => /^semantic caching/i.test(s.title || ""));
+        if (!heading) return { ok: false, note: "dropped a real heading slide" };
+        return heading.body ? { ok: true } : { ok: false, note: "heading kept but its detail was lost" };
+      },
+    },
+    {
+      id: "corpus-shaped-post-still-traceable",
+      check: () => {
+        // Everything above rewrites less than it used to, so re-assert the invariant that matters.
+        const post = "If you want your agents to grow, start by wiring them into the existing stack.\n\nBy routing every recommendation through that API, we cut launch time from hours to minutes.\n\nThe registry also assigns a clear identity to each agent, so you know which bot did what.\n\nThat habit keeps operators ahead of complexity.";
+        for (const s of deck(post).slides) {
+          if (s.kind === "brand") continue;
+          for (const part of [s.title, s.body]) {
+            if (part && !traceableTo(part, post)) return { ok: false, note: `not in the post: "${part}"` };
+          }
+        }
+        return { ok: true };
       },
     },
   ], (c) => c.check());
@@ -455,7 +586,7 @@ export async function run() {
     return { ok: true };
   });
 
-  return [r1, r2, r3, r4, r5, r5b, r5c, r6, r7, r8, r8b, r9, r10];
+  return [r1, r2, r3, r4, r5, r5b, r5c, r6, r7, r7b, r8, r8b, r8c, r9, r10];
 }
 
 if (isMain(import.meta.url)) {
