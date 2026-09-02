@@ -5,6 +5,7 @@ import "./_env.mjs";
 import { run as routing } from "./routing/run.mjs";
 import { run as json } from "./json/run.mjs";
 import { run as linkedin } from "./linkedin/run.mjs";
+import { run as linkedinSlides } from "./linkedin-slides/run.mjs";
 import { run as critique } from "./critique/run.mjs";
 import { run as mcp } from "./mcp/run.mjs";
 import { run as tier } from "./tier/run.mjs";
@@ -25,7 +26,7 @@ import { run as jobFeedback } from "./job-feedback/run.mjs";
 import { run as jobDedupe } from "./job-dedupe/run.mjs";
 import { run as slot } from "./slot/run.mjs";
 
-const suites = [routing, json, linkedin, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, format, integrity, winners, reconcile, calendar, health, jobFilter, jobApply, jobFeedback, jobDedupe, slot];
+const suites = [routing, json, linkedin, linkedinSlides, critique, mcp, tier, memory, llmRouting, skillgap, review, engagement, format, integrity, winners, reconcile, calendar, health, jobFilter, jobApply, jobFeedback, jobDedupe, slot];
 
 let totalPass = 0, totalFail = 0;
 const allFails = [];

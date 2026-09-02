@@ -18,6 +18,11 @@ import { PROFILE } from "../../lib/profile.js";
 
 export const CARD_SIZE = 1200;
 
+// The MIGI half-moon's radius as a fraction of the disc's, measured off the source artwork. Shared
+// because the carousel's brand slide draws the same mark with a different toolkit (pdfkit, not SVG)
+// — two hardcoded copies of this number would drift and the two surfaces would stop matching.
+export const MOON_RATIO = 0.79;
+
 // Brand — kept here so the whole look is one edit away.
 export const BRAND = {
   bg: "#0E1116",
@@ -246,7 +251,7 @@ function backdrop(S, seed) {
   // flat edge vertical, which reads as intentional — the same way any logo watermark sits upright.
 
   // The ghost is the MIGI silhouette: disc minus half-moon, so the brand shape reads even at 5%.
-  const gm = ghostR * 0.79;
+  const gm = ghostR * MOON_RATIO;
 
   return `
   <defs>
@@ -288,7 +293,7 @@ function backdrop(S, seed) {
 export function migiMark(x, y, size) {
   const r = size / 2;
   const cx = x + r, cy = y + r;
-  const mr = r * 0.79;                       // half-moon radius, measured off the source artwork
+  const mr = r * MOON_RATIO;                 // half-moon radius, measured off the source artwork
   // Start at the top of the flat edge, sweep counter-clockwise to the bottom: bulges left.
   const moon = `M ${cx} ${cy - mr} A ${mr} ${mr} 0 0 0 ${cx} ${cy + mr} Z`;
   return `<g>
