@@ -80,6 +80,23 @@ function mark(doc, cx, cy, r, { ground = THEME.bg0 } = {}) {
 }
 
 /**
+ * The MIGI silhouette as ONE compound path — disc and half-moon together, filled even-odd so the
+ * moon is a hole rather than a shape painted over the disc.
+ *
+ * This is what makes a faint watermark possible. Painting the moon in the ground colour only works
+ * while the ground is a flat known colour; over a gradient with a bloom and a dot grid it either
+ * punches an opaque patch or, at low opacity, disappears entirely — which is exactly why the
+ * previous background mark read as a plain circle. A hole is transparent at any opacity, so the
+ * brand shape survives all the way down to 6%.
+ */
+function ghostMark(doc, cx, cy, r, alpha) {
+  const mr = r * MOON_RATIO;
+  const disc = `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} Z`;
+  const moon = `M ${cx} ${cy - mr} A ${mr} ${mr} 0 0 0 ${cx} ${cy + mr} Z`;
+  faded(doc, alpha, () => doc.path(`${disc} ${moon}`).fill(THEME.brand, "even-odd"));
+}
+
+/**
  * Mark plus wordmark. A bare disc at header size reads as a bullet point; with "MIGI" set beside it
  * the same shape reads as a logo. They travel together everywhere except the brand slide, where the
  * lockup is stacked instead.
@@ -99,7 +116,7 @@ function lockup(doc, x, y, size, { color = THEME.ink } = {}) {
  * any two looking like different decks. Index-driven, not random, because this module must stay
  * deterministic: the draft preview and the published file have to be identical.
  */
-function ground(doc, i) {
+function ground(doc, i, { watermark = true } = {}) {
   const S = SLIDE_SIZE;
   const g = doc.linearGradient(0, 0, S, S);
   g.stop(0, THEME.bg0).stop(1, THEME.bg1);
@@ -116,8 +133,20 @@ function ground(doc, i) {
   const [fx, fy] = spots[i % spots.length];
   const bx = S * fx, by = S * fy;
   const bloom = doc.radialGradient(bx, by, 0, bx, by, S * 0.62);
-  bloom.stop(0, THEME.brand, 0.10).stop(1, THEME.brand, 0);
+  bloom.stop(0, THEME.brand, 0.11).stop(1, THEME.brand, 0);
   doc.rect(0, 0, S, S).fill(bloom);
+
+  // The brand watermark: the MIGI silhouette, large and cropped by the right edge, sitting behind
+  // everything. Anchored rather than cycled — a watermark that moves is not a watermark. A soft
+  // bloom centred on it lifts it off the ground so it reads as diffused light rather than as a
+  // sticker at low opacity.
+  if (watermark) {
+    const cx = S * 1.02, cy = S * 0.72, r = S * 0.42;
+    const halo = doc.radialGradient(cx, cy, r * 0.2, cx, cy, r * 1.5);
+    halo.stop(0, THEME.brand, 0.07).stop(1, THEME.brand, 0);
+    doc.rect(0, 0, S, S).fill(halo);
+    ghostMark(doc, cx, cy, r, 0.075);
+  }
 }
 
 /** Header: logo lockup left, section label right. Identical y on every slide. */
@@ -144,25 +173,24 @@ function pill(doc, n, total) {
   // characterSpacing is a TEXT option in pdfkit, not a document mode — it has to be passed to the
   // measurement too, or the capsule is sized for tighter text than it ends up holding.
   doc.font(BOLD).fontSize(15);
-  const tw = doc.widthOfString(label, { characterSpacing: 1.6 });
-  const h = 38, w = tw + 40;
-  const x = SLIDE_SIZE - PAD - w, y = FOOT_Y + 6;
+  const tw = doc.widthOfString(label, { characterSpacing: 1.8 });
+  const h = 40, w = Math.max(112, tw + 42);
+  const x = SLIDE_SIZE - PAD - w, y = FOOT_Y + 2;
 
-  doc.roundedRect(x, y, w, h, h / 2).lineWidth(1.2).strokeColor(THEME.brand).stroke();
-  doc.font(BOLD).fontSize(15).fillColor(THEME.brand)
-    .text(label, x, y + 12, { width: w, align: "center", characterSpacing: 1.6, lineBreak: false });
+  // SOLID, not outlined. A thin lime outline around small lime text is two hairlines saying the
+  // same thing, and at feed scale it disintegrates. Filled, the capsule is one confident shape and
+  // the numbers sit on it in the ground colour at full contrast.
+  doc.roundedRect(x, y, w, h, h / 2).fill(THEME.brand);
+  doc.font(BOLD).fontSize(15).fillColor(THEME.onBrand)
+    .text(label, x, y + 13, { width: w, align: "center", characterSpacing: 1.8, lineBreak: false });
 
-  // Segmented track: one tick per slide, filled up to the current one. The pill says the number,
-  // the track shows the shape of it without being read.
-  const tw2 = 132, gap = 5;
-  const seg = (tw2 - gap * (total - 1)) / total;
-  const ty = y + h + 13, tx = SLIDE_SIZE - PAD - tw2;
-  for (let k = 0; k < total; k++) {
-    const on = k < n;
-    faded(doc, on ? 1 : 0.22, () => {
-      doc.roundedRect(tx + k * (seg + gap), ty, seg, 3.5, 1.75).fill(on ? THEME.brand : THEME.dim);
-    });
-  }
+  // ONE continuous track, exactly the capsule's width and directly under it, rather than a row of
+  // separate ticks. The segmented version scattered six small dashes of two different colours below
+  // an outlined pill — three competing elements in a 130px box, which read as debris rather than as
+  // progress. A single bar with a filled portion says the same thing in one shape.
+  const ty = y + h + 12, tr = 3;
+  faded(doc, 0.28, () => doc.roundedRect(x, ty, w, tr * 2, tr).fill(THEME.dim));
+  doc.roundedRect(x, ty, Math.max(tr * 2, (w * n) / total), tr * 2, tr).fill(THEME.brand);
 }
 
 /** Footer: who this is, and where you are in the deck. */
@@ -317,7 +345,9 @@ function drawPoint(doc, slide, ctx) {
  * The lockup is stacked and large here; this is the one place the mark is allowed to dominate.
  */
 function drawBrand(doc, slide, ctx) {
-  ground(doc, ctx.i);
+  // No background watermark here: the mark is the subject of this slide at full size and full
+  // strength. A ghost of the same shape behind it would just look like a printing error.
+  ground(doc, ctx.i, { watermark: false });
   header(doc, ctx.kicker);
 
   const S = SLIDE_SIZE;
