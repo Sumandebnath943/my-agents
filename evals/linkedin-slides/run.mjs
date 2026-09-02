@@ -596,6 +596,20 @@ export async function run() {
       },
     },
     {
+      id: "87-lead-in-inside-a-paragraph-is-dropped",
+      check: () => {
+        // From the FIRST published carousel. isConnector tests the whole segment, and this
+        // paragraph ends on a different line, so no trailing colon was seen — the lead-in became
+        // the headline and the actual advice was demoted to the supporting line.
+        const post = "LLM benchmarks are not crystal balls.\n\nA new method confirms this: a single score combines multiple capabilities.\n\nThis means one model might get a high score for unintended reasons.\n\nHere's what this means for operators:\nDeconstruct benchmarks and identify the exact capability each score reflects.\nAvoid aggregated scores, which hide the mix of abilities behind one number.";
+        const d = deck(post);
+        const bad = d.slides.find((s) => /^here'?s what this means/i.test(s.title || ""));
+        if (bad) return { ok: false, note: `lead-in became a headline: "${bad.title}"` };
+        const real = d.slides.find((s) => /^deconstruct benchmarks/i.test(s.title || ""));
+        return real ? { ok: true } : { ok: true, note: "lead-in dropped but the advice did not lead (warn)" };
+      },
+    },
+    {
       id: "short-heading-with-detail-survives",
       check: () => {
         // "Semantic caching." over its explanation is a deliberate heading, not a fragment. Only a

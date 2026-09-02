@@ -183,7 +183,20 @@ export function compress(segment, { titleMax = 140, bodyMax = 200 } = {}) {
   // "Orchestrate AI workloads with a simple allocation rule" / "Use a priority queue that…". That
   // is already the title/body shape, so honour it before anything else. Joining those lines with a
   // space produced "…allocation rule Use a priority queue…", a sentence with no punctuation in it.
-  const lines = s.split("\n").map((l) => l.trim()).filter(Boolean);
+  let lines = s.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  // Drop lead-in lines from the TOP of a multi-line paragraph before treating the first line as a
+  // heading. Caught on the first published carousel (post 87): the paragraph was
+  //
+  //   Here's what this means for operators:
+  //   Deconstruct benchmarks: identify the exact capability each score reflects...
+  //
+  // isConnector() tests the whole SEGMENT, and this one ends on a different line entirely, so it
+  // saw no trailing colon and let it through — then the heading rule below made the lead-in the
+  // headline and buried the actual advice in the supporting line.
+  while (lines.length > 1 && isConnector(lines[0])) lines = lines.slice(1);
+  if (!lines.length) return { title: "", body: "" };
+
   if (lines.length > 1 && lines[0].length <= HARD) {
     return {
       title: clampChars(lines[0], HARD),
