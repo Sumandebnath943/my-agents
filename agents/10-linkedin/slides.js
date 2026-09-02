@@ -118,8 +118,29 @@ export function sentences(text) {
  * headline, it breaks at the strongest internal punctuation instead of being cut mid-thought —
  * an em-dash or colon is almost always where the claim ends and the elaboration begins.
  */
+/**
+ * A leading clause that sets up a claim without being one: "In my work with AI-native products, …",
+ * "Over the last year, …". Kept in the same family as card.js's cardScore, which already penalises
+ * these openers when choosing a card line — for the same reason, arrived at the same way.
+ */
+const PREAMBLE = /^(?:in my (?:work|experience)[^,]{0,40}|from my [^,]{0,40}|i'?ve [^,]{0,40}|i have [^,]{0,40}|when i [^,]{0,40}|over the (?:last|past) [^,]{0,30}|after [^,]{0,30}),\s+/i;
+
+/**
+ * Drop a setup clause so the CLAIM leads.
+ *
+ * A slide headline that reads "In my work with AI-native products" says nothing and buries "the
+ * data layer is where that control actually lives" in the supporting line underneath it. The words
+ * are not invented or reordered — a prefix is removed and the next letter capitalised, so the line
+ * still traces back to the post verbatim.
+ */
+export function stripPreamble(s) {
+  const out = String(s || "").replace(PREAMBLE, "");
+  if (out === s || out.length < 30) return s;
+  return out[0].toUpperCase() + out.slice(1);
+}
+
 export function compress(segment, { titleMax = 74, bodyMax = 180 } = {}) {
-  const s = String(segment || "").trim();
+  const s = stripPreamble(String(segment || "").trim());
   if (!s) return { title: "", body: "" };
 
   // titleMax is the size a claim WANTS to be, not a hard edge. The renderer shrinks text to fit
@@ -155,7 +176,14 @@ export function compress(segment, { titleMax = 74, bodyMax = 180 } = {}) {
     }
   }
 
-  return { title: clampChars(title, HARD), body: clampChars(rest, bodyMax) };
+  // Capitalise the supporting line. When it is the tail of a split claim it starts mid-sentence
+  // ("and that is exactly why…"), and a lowercase opener under a headline reads as a fragment
+  // someone forgot to finish. Case is the only thing changed — the words stay Suman's.
+  const body = clampChars(rest, bodyMax);
+  return {
+    title: clampChars(title, HARD),
+    body: body ? body[0].toUpperCase() + body.slice(1) : "",
+  };
 }
 
 /**
@@ -242,6 +270,66 @@ export function documentTitle(post, { sourceHeadline = "", maxSim = 0.6, max = 1
   // post after its first BULLET rather than after its own opening line.
   const candidates = [openingLine(post), ...segments(post)].filter(Boolean);
   const pick = candidates.find((s) => !sourceHeadline || similarity(s, sourceHeadline) <= maxSim);
-  // No safe line: a generic title is always available and says nothing that could be passed off.
-  return clampChars(pick || "A short read", max);
+  // Returns "" rather than inventing a title. An earlier version fell back to the string "A short
+  // read", which is text that came from nowhere in the post and nowhere in the article — exactly
+  // the kind of filler this module must never produce. An empty title is the caller's problem to
+  // handle; a made-up one is a credibility problem on a published surface.
+  return pick ? clampChars(pick, max) : "";
+}
+
+// ---- Provenance -----------------------------------------------------------------------------
+// Slides cannot invent content: buildSlides only ever slices and trims sentences that are already
+// in the post, and the post is written by 10a-draft.js from the article it actually read (it feeds
+// the model 9000 chars of article text with "every fact, number, name and quote must come from
+// it"). But "cannot" is worth nothing unasserted, so both properties below are checkable.
+
+const squash = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * True when every word of a slide's text is present, in order, in the post it came from.
+ *
+ * Compared with punctuation and whitespace removed, because compression legitimately drops a
+ * trailing clause, changes where a line breaks, and trims terminal punctuation — none of which
+ * introduces a word the post did not contain, which is the property being asserted.
+ */
+export function traceableTo(text, post) {
+  const needle = squash(String(text || "").replace(/…$/, ""));
+  return !needle || squash(post).includes(needle);
+}
+
+/**
+ * Numbers, percentages, money and years in a piece of text.
+ *
+ * Figures are where fabrication actually costs something. A slightly loose paraphrase of a claim is
+ * a style problem; an invented "40%" under Suman's name is a credibility problem, and it is the one
+ * category a reader will check.
+ */
+export function figuresIn(text) {
+  return [...String(text || "").matchAll(/\b\d[\d,.]*\s?(?:%|percent|bn|billion|million|k\b|x\b)?/gi)]
+    .map((m) => m[0].trim())
+    .filter((f) => f.length > 1);
+}
+
+/**
+ * Figures on a slide that do NOT appear in the source article.
+ *
+ * Deliberately narrow. A slide legitimately carries Suman's own framing and personal angle, which
+ * are not in the article and must not be flagged — checking every claim against the article would
+ * fire on exactly the sentences the post exists to contain. Only the digits are checked, and only
+ * when the article was actually retrieved: `readArticle` in 10a-draft.js returns null for hosts
+ * that defeat the scraper, and an unverifiable slide must not be reported as a verified one.
+ *
+ * @returns {Array<{slide: number, figure: string, text: string}>} empty when nothing is unsupported
+ */
+export function unsupportedFigures(slides, article) {
+  if (!article) return [];
+  const hay = squash(article);
+  const out = [];
+  (slides || []).forEach((s, i) => {
+    const text = `${s.title || ""} ${s.body || ""}`;
+    for (const f of figuresIn(text)) {
+      if (!hay.includes(squash(f))) out.push({ slide: i + 1, figure: f, text: text.trim() });
+    }
+  });
+  return out;
 }

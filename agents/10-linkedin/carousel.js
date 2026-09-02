@@ -7,139 +7,339 @@
 // (proven against the live API by scripts/linkedin-document-spike.mjs). So a deck built from
 // pictures of text is unreadable to a screen reader with no way to compensate. Drawn natively,
 // every slide carries a real text layer: selectable, searchable, accessible, and a fraction of the
-// file size. The spike also confirmed LinkedIn accepts pdfkit's output as-is, multi-page and
-// square, so this is a proven path rather than a hopeful one.
+// file size.
 //
-// WHY 1080pt SQUARE: a LinkedIn carousel renders 1:1 in feed. Using points 1:1 with the pixel
-// convention keeps every measurement here directly comparable to card.js's 1200px geometry.
+// WHY 1080pt SQUARE: a LinkedIn carousel renders 1:1 in feed.
 //
-// FONTS: pdfkit's built-in Helvetica/Helvetica-Bold are embedded in the PDF itself, so output is
-// identical on the GitHub runner and on Windows. This is strictly better than the card's position —
-// card.js depends on resvg resolving a SYSTEM font, which substitutes differently per machine.
+// FONTS: pdfkit's built-in Helvetica/Helvetica-Bold are embedded in the PDF, so output is identical
+// on the GitHub runner and on Windows. Strictly better than the card's position — card.js depends
+// on resvg resolving a SYSTEM font, which substitutes differently per machine. The cost is exactly
+// two weights, so hierarchy here is built from size, colour, case and letterspacing rather than
+// from six font files.
+//
+// DESIGN INTENT: this deck has to survive a thumb moving at speed. That means one loud thing per
+// slide and a lot of quiet around it — not more decoration. Three rules hold the whole thing
+// together:
+//   1. ONE accent colour. Lime appears on the logo, the eyebrow, the rule and the pill, and
+//      nowhere else. The moment a second colour earns a place, the accent stops meaning anything.
+//   2. A fixed frame. Header and footer sit at the same y on every slide, so only the middle
+//      changes as you swipe — which is what makes the deck feel like one object.
+//   3. Variation from typography and layout, never from palette.
 import PDFDocument from "pdfkit";
-import { BRAND, MOON_RATIO } from "./card.js";
+import { MOON_RATIO } from "./card.js";
 
 export const SLIDE_SIZE = 1080;
-const PAD = 88;
-const BAR = 20;                       // the lime spine down the left edge, as on the card
+
+// ---- Design tokens ---------------------------------------------------------------------------
+// Deliberately NOT card.js's BRAND. The card is a single square that must read alone in a feed; a
+// deck is eight surfaces read in sequence and wants a deeper, quieter ground so the accent can do
+// the work. One primary colour, everything else neutral.
+export const THEME = {
+  bg0: "#090B0F",        // base — near-black, so the accent reads as light rather than paint
+  bg1: "#141A23",        // gradient partner
+  ink: "#F7F6F1",        // headlines
+  dim: "#9BA3AF",        // supporting text
+  rule: "#222A35",       // hairlines
+  brand: "#C6F24E",      // THE primary. The only chromatic colour in the entire deck.
+  onBrand: "#090B0F",    // text/shape sitting ON the primary
+};
+
+const PAD = 92;
+const HEAD_Y = 84;                    // header baseline band
+const FOOT_Y = SLIDE_SIZE - 132;      // footer band top
+const BODY_TOP = 250;
+const BODY_BOT = FOOT_Y - 56;
 const FONT = "Helvetica", BOLD = "Helvetica-Bold";
 
-/** Fill the whole slide with the card's background gradient, spine, and a faint brand ghost. */
-function slideGround(doc, { ghost = true } = {}) {
-  const S = SLIDE_SIZE;
-  const grad = doc.linearGradient(0, 0, S, S);
-  grad.stop(0, BRAND.bg).stop(1, BRAND.bgAccent);
-  doc.rect(0, 0, S, S).fill(grad);
+const W = SLIDE_SIZE - PAD * 2;
 
-  // A single faint mark bottom-right, cropped by the edge — the card's backdrop reduced to its one
-  // load-bearing element. The card's dot grid and orbit rings are deliberately NOT reproduced: at
-  // slide scale, across six pages, they read as noise rather than texture.
-  if (ghost) {
-    doc.save().opacity(0.055);
-    drawMark(doc, S * 0.88, S * 0.84, S * 0.30);
-    doc.restore();
-  }
+// ---- Primitives ------------------------------------------------------------------------------
 
-  doc.rect(0, 0, BAR, S).fill(BRAND.accent);
+/** Run `fn` at a given alpha without leaking the alpha into everything drawn afterwards. */
+function faded(doc, alpha, fn) {
+  doc.save().opacity(alpha);
+  fn();
+  doc.restore();
 }
 
 /**
- * The MIGI mark: a lime disc with a dark half-moon bulging left, the flat edge on the centre line.
- * Same geometry as card.js's migiMark — the ratio is imported rather than retyped so the two
- * surfaces cannot drift apart.
- */
-function drawMark(doc, cx, cy, r, { disc = BRAND.accent, moon = BRAND.bg } = {}) {
-  const mr = r * MOON_RATIO;
-  doc.circle(cx, cy, r).fill(disc);
-  // pdfkit parses SVG path data, arcs included, so the half-moon is the identical path string the
-  // card builds — one shape definition, two renderers.
-  doc.path(`M ${cx} ${cy - mr} A ${mr} ${mr} 0 0 0 ${cx} ${cy + mr} Z`).fill(moon);
-}
-
-/**
- * Largest font size at which `text` fits the box, measured with pdfkit's own metrics.
+ * The MIGI mark: a lime disc with a dark half-moon bulging left, flat edge on the centre line.
+ * Geometry shared with card.js so the two surfaces cannot drift.
  *
- * card.js has to ESTIMATE text width (AVG_ADVANCE) because SVG cannot measure. pdfkit can, so this
- * shrink-to-fit is exact rather than conservative — long claims stay a size or two larger than the
- * equivalent card line, and nothing overflows.
+ * The moon is filled with an OPAQUE ground colour rather than being punched out, because the mark
+ * sits on a gradient. Reproducing it as a ghost at 5% — which an earlier version did, at a third of
+ * the canvas — made the moon invisible and left what read as a giant plain circle. The mark is now
+ * drawn small, sharp and at full opacity, which is the only size at which a logo is legible.
  */
-function fitSize(doc, text, { font, width, height, max, min, gap = 1.22 }) {
+function mark(doc, cx, cy, r, { ground = THEME.bg0 } = {}) {
+  const mr = r * MOON_RATIO;
+  doc.circle(cx, cy, r).fill(THEME.brand);
+  // pdfkit parses SVG path data, arcs included, so this is the identical path string the card
+  // builds — one shape definition, two renderers.
+  doc.path(`M ${cx} ${cy - mr} A ${mr} ${mr} 0 0 0 ${cx} ${cy + mr} Z`).fill(ground);
+}
+
+/**
+ * Mark plus wordmark. A bare disc at header size reads as a bullet point; with "MIGI" set beside it
+ * the same shape reads as a logo. They travel together everywhere except the brand slide, where the
+ * lockup is stacked instead.
+ */
+function lockup(doc, x, y, size, { color = THEME.ink } = {}) {
+  const r = size / 2;
+  mark(doc, x + r, y + r, r);
+  doc.font(BOLD).fontSize(size * 0.62).fillColor(color)
+    .text("MIGI", x + size + size * 0.36, y + size * 0.24, { lineBreak: false, characterSpacing: size * 0.055 });
+}
+
+/**
+ * Background. A flat fill reads as a slide template; this reads as a surface.
+ *
+ * Three layers, all faint: a diagonal gradient, a sparse dot grid for texture, and one soft bloom of
+ * the accent whose corner MOVES BY SLIDE INDEX — so consecutive slides are subtly different without
+ * any two looking like different decks. Index-driven, not random, because this module must stay
+ * deterministic: the draft preview and the published file have to be identical.
+ */
+function ground(doc, i) {
+  const S = SLIDE_SIZE;
+  const g = doc.linearGradient(0, 0, S, S);
+  g.stop(0, THEME.bg0).stop(1, THEME.bg1);
+  doc.rect(0, 0, S, S).fill(g);
+
+  faded(doc, 0.05, () => {
+    for (let x = 40; x < S; x += 64) {
+      for (let y = 40; y < S; y += 64) doc.circle(x, y, 1.5).fill(THEME.brand);
+    }
+  });
+
+  // Four bloom positions, cycled. Enough variety to feel alive, few enough to stay coherent.
+  const spots = [[0.14, 0.10], [0.88, 0.16], [0.10, 0.86], [0.90, 0.82]];
+  const [fx, fy] = spots[i % spots.length];
+  const bx = S * fx, by = S * fy;
+  const bloom = doc.radialGradient(bx, by, 0, bx, by, S * 0.62);
+  bloom.stop(0, THEME.brand, 0.10).stop(1, THEME.brand, 0);
+  doc.rect(0, 0, S, S).fill(bloom);
+}
+
+/** Header: logo lockup left, section label right. Identical y on every slide. */
+function header(doc, label) {
+  lockup(doc, PAD, HEAD_Y, 42);
+  if (label) {
+    doc.font(BOLD).fontSize(15).fillColor(THEME.dim)
+      .text(label.toUpperCase(), PAD, HEAD_Y + 14, { width: W, align: "right", characterSpacing: 2.4, lineBreak: false });
+  }
+  faded(doc, 0.55, () => {
+    doc.moveTo(PAD, HEAD_Y + 66).lineTo(SLIDE_SIZE - PAD, HEAD_Y + 66).lineWidth(1).strokeColor(THEME.rule).stroke();
+  });
+}
+
+/**
+ * The progression pill: a capsule carrying the position, with a segmented track under it.
+ *
+ * Present on every slide because its job is to tell a reader how much is left — the single biggest
+ * lever on whether a deck gets swiped to the end. A counter that appeared only on some slides would
+ * answer that question intermittently, which is worse than not answering it.
+ */
+function pill(doc, n, total) {
+  const label = `${String(n).padStart(2, "0")} / ${String(total).padStart(2, "0")}`;
+  // characterSpacing is a TEXT option in pdfkit, not a document mode — it has to be passed to the
+  // measurement too, or the capsule is sized for tighter text than it ends up holding.
+  doc.font(BOLD).fontSize(15);
+  const tw = doc.widthOfString(label, { characterSpacing: 1.6 });
+  const h = 38, w = tw + 40;
+  const x = SLIDE_SIZE - PAD - w, y = FOOT_Y + 6;
+
+  doc.roundedRect(x, y, w, h, h / 2).lineWidth(1.2).strokeColor(THEME.brand).stroke();
+  doc.font(BOLD).fontSize(15).fillColor(THEME.brand)
+    .text(label, x, y + 12, { width: w, align: "center", characterSpacing: 1.6, lineBreak: false });
+
+  // Segmented track: one tick per slide, filled up to the current one. The pill says the number,
+  // the track shows the shape of it without being read.
+  const tw2 = 132, gap = 5;
+  const seg = (tw2 - gap * (total - 1)) / total;
+  const ty = y + h + 13, tx = SLIDE_SIZE - PAD - tw2;
+  for (let k = 0; k < total; k++) {
+    const on = k < n;
+    faded(doc, on ? 1 : 0.22, () => {
+      doc.roundedRect(tx + k * (seg + gap), ty, seg, 3.5, 1.75).fill(on ? THEME.brand : THEME.dim);
+    });
+  }
+}
+
+/** Footer: who this is, and where you are in the deck. */
+function footer(doc, { name, site, n, total }) {
+  faded(doc, 0.55, () => {
+    doc.moveTo(PAD, FOOT_Y - 26).lineTo(SLIDE_SIZE - PAD, FOOT_Y - 26).lineWidth(1).strokeColor(THEME.rule).stroke();
+  });
+  if (name) {
+    doc.font(BOLD).fontSize(17).fillColor(THEME.ink).text(name, PAD, FOOT_Y + 10, { lineBreak: false });
+    doc.font(FONT).fontSize(14).fillColor(THEME.dim).text(site || "", PAD, FOOT_Y + 33, { lineBreak: false });
+  }
+  pill(doc, n, total);
+}
+
+/**
+ * Largest size at which `text` fits the box, measured with pdfkit's own metrics.
+ * card.js has to ESTIMATE width (AVG_ADVANCE) because SVG cannot measure; pdfkit can, so this is
+ * exact rather than conservative and headlines stay a size or two larger than the card's.
+ */
+function fitSize(doc, text, { font, width, height, max, min, ratio = LEAD.head }) {
   for (let size = max; size >= min; size -= 2) {
     doc.font(font).fontSize(size);
-    if (doc.heightOfString(text, { width, lineGap: size * (gap - 1) }) <= height) return size;
+    if (doc.heightOfString(text, { width, lineGap: size * ratio }) <= height) return size;
   }
   return min;
 }
 
-function drawHook(doc, slide) {
-  const S = SLIDE_SIZE, W = S - PAD * 2;
-  slideGround(doc);
+/**
+ * Leading, as a multiple of the type size ADDED to pdfkit's natural line height (~1.15em).
+ *
+ * Display type wants tighter leading than body copy — at 1.15em a four-line headline stops reading
+ * as one sentence and starts reading as four separate lines, which is exactly how the first version
+ * looked. Negative closes it up; the body line stays open.
+ */
+const LEAD = { head: -0.1, body: 0.32 };
 
-  doc.font(BOLD).fontSize(24).fillColor(BRAND.accent)
-    .text("AI, IN PRACTICE", PAD, 132, { width: W, characterSpacing: 3.2 });
+/**
+ * Draw a headline (and optional supporting line) as ONE block, vertically centred in the space
+ * between the header and the footer.
+ *
+ * Top-aligning the content left the bottom 40% of every point slide empty — the deck read as a
+ * template with the text poured into the first slot rather than as a designed page. Centring the
+ * whole block, measured after the type has been fitted, is what makes short claims and long claims
+ * sit equally well on the same frame.
+ *
+ * @returns {number} the y at which the block ends, for anything that draws relative to it
+ */
+function centredBlock(doc, { title, body, left, width, top, bottom, titleMax, titleMin, lead = 0 }) {
+  const avail = bottom - top;
+  const gap = body ? 30 : 0;
+  // `lead` reserves height ABOVE the headline for something that belongs to the group — the point
+  // numeral. Excluded from the centring, the numeral hung above a correctly-centred block and the
+  // whole slide read top-heavy: the eye groups the numeral with the claim whether the maths does or
+  // not.
 
-  const top = 236, box = S - 300 - top;
-  const size = fitSize(doc, slide.title, { font: BOLD, width: W, height: box, max: 82, min: 40 });
-  doc.font(BOLD).fontSize(size).fillColor(BRAND.ink)
-    .text(slide.title, PAD, top, { width: W, lineGap: size * 0.22 });
+  const ts = fitSize(doc, title, { font: BOLD, width, height: avail - (body ? 150 : 0), max: titleMax, min: titleMin });
+  doc.font(BOLD).fontSize(ts);
+  const th = doc.heightOfString(title, { width, lineGap: ts * LEAD.head });
 
-  doc.font(FONT).fontSize(22).fillColor(BRAND.muted)
-    .text("Swipe →", PAD, S - 150, { width: W });
-}
-
-function drawPoint(doc, slide) {
-  const S = SLIDE_SIZE, W = S - PAD * 2;
-  slideGround(doc);
-
-  // A visible position counter. Without one the reader cannot tell a three-slide deck from a
-  // nine-slide deck, and drop-off is worst where people cannot see how much is left.
-  doc.font(BOLD).fontSize(22).fillColor(BRAND.accent)
-    .text(`${String(slide.n).padStart(2, "0")} / ${String(slide.of).padStart(2, "0")}`, PAD, 132, { width: W, characterSpacing: 2 });
-
-  const top = 230;
-  const bodyH = slide.body ? 300 : 0;
-  const box = S - 260 - top - bodyH;
-  const size = fitSize(doc, slide.title, { font: BOLD, width: W, height: box, max: 66, min: 34 });
-  doc.font(BOLD).fontSize(size).fillColor(BRAND.ink)
-    .text(slide.title, PAD, top, { width: W, lineGap: size * 0.2 });
-
-  if (slide.body) {
-    // Measured against the space the TITLE actually left, not a guess. The title shrinks to fit but
-    // still wraps to a variable number of lines, so a fixed body size could run past the rule on a
-    // slide with a long claim and a long supporting line. Both now shrink; neither can overflow.
-    doc.moveDown(0.6);
-    const y = Math.min(doc.y + 14, S - 320);
-    const room = (S - 168) - y;
-    const bodySize = fitSize(doc, slide.body, { font: FONT, width: W, height: room, max: 28, min: 19 });
-    doc.font(FONT).fontSize(bodySize).fillColor(BRAND.muted)
-      .text(slide.body, PAD, y, { width: W, lineGap: bodySize * 0.28 });
+  let bs = 0, bh = 0;
+  if (body) {
+    bs = fitSize(doc, body, { font: FONT, width, height: Math.max(60, avail - th - gap), max: 27, min: 18, ratio: LEAD.body });
+    doc.font(FONT).fontSize(bs);
+    bh = doc.heightOfString(body, { width, lineGap: bs * LEAD.body });
   }
 
-  doc.moveTo(PAD, S - 132).lineTo(S - PAD, S - 132).lineWidth(2).strokeColor(BRAND.rule).stroke();
+  const y = top + Math.max(0, (avail - (lead + th + gap + bh)) / 2) + lead;
+
+  doc.font(BOLD).fontSize(ts).fillColor(THEME.ink)
+    .text(title, left, y, { width, lineGap: ts * LEAD.head });
+
+  if (body) {
+    doc.font(FONT).fontSize(bs).fillColor(THEME.dim)
+      .text(body, left, y + th + gap, { width, lineGap: bs * LEAD.body });
+  }
+
+  return { top: y, bottom: y + th + gap + bh, titleBottom: y + th };
+}
+
+/** Small caps eyebrow — the quiet line that sets up the loud one. */
+function eyebrow(doc, text, y) {
+  doc.font(BOLD).fontSize(16).fillColor(THEME.brand)
+    .text(String(text).toUpperCase(), PAD, y, { width: W, characterSpacing: 3.4, lineBreak: false });
+}
+
+// ---- Slide types -----------------------------------------------------------------------------
+
+function drawHook(doc, slide, ctx) {
+  ground(doc, ctx.i);
+  header(doc, ctx.kicker);
+
+  // The hook reserves room above and below the headline for the eyebrow and the swipe cue, then
+  // centres the headline in what is left — so the three elements read as one centred group.
+  const blk = centredBlock(doc, {
+    title: slide.title, left: PAD, width: W,
+    top: BODY_TOP + 6, bottom: BODY_BOT - 60,
+    titleMax: 96, titleMin: 44,
+  });
+
+  eyebrow(doc, "Start here", blk.top - 46);
+
+  // A short accent rule under the headline. Reads as an underline on the claim rather than as
+  // another divider — the frame already has two of those.
+  doc.rect(PAD, blk.bottom + 34, 96, 5).fill(THEME.brand);
+  doc.font(BOLD).fontSize(17).fillColor(THEME.dim)
+    .text("SWIPE", PAD, blk.bottom + 62, { characterSpacing: 3.2, lineBreak: false });
 }
 
 /**
- * The brand slide — always last. The mark is the slide, not a footnote on it: roughly a third of
- * the canvas, centred, with the credit under it. This is the one page whose job is recall rather
- * than information, so it carries no post content at all.
+ * Point slides, in two alternating treatments.
+ *
+ * Variation is the difference between a deck and a slideshow: six identically-composed slides train
+ * the eye to stop reading by slide three. Both treatments use the same frame, the same type ramp and
+ * the same single accent — only the emphasis moves. Chosen by index, so it stays deterministic.
  */
-function drawBrand(doc, slide) {
-  const S = SLIDE_SIZE, W = S - PAD * 2;
-  slideGround(doc, { ghost: false });
+function drawPoint(doc, slide, ctx) {
+  ground(doc, ctx.i);
+  header(doc, ctx.kicker);
 
-  drawMark(doc, S / 2, S * 0.38, S * 0.17);
+  const variantA = slide.n % 2 === 1;
+  const left = variantA ? PAD : PAD + 36;
+  const width = variantA ? W : W - 36;
 
-  doc.font(BOLD).fontSize(46).fillColor(BRAND.ink)
-    .text(slide.watermark, PAD, S * 0.60, { width: W, align: "center" });
-  doc.font(FONT).fontSize(26).fillColor(BRAND.accent)
-    .text(slide.descriptor, PAD, S * 0.60 + 62, { width: W, align: "center" });
+  const NUMERAL = 104;
+  const blk = centredBlock(doc, {
+    title: slide.title, body: slide.body, left, width,
+    top: BODY_TOP, bottom: BODY_BOT,
+    titleMax: 68, titleMin: 32,
+    lead: variantA ? NUMERAL : 0,
+  });
 
-  doc.moveTo(S * 0.34, S * 0.78).lineTo(S * 0.66, S * 0.78).lineWidth(2).strokeColor(BRAND.rule).stroke();
+  if (variantA) {
+    // A: the point number as a large OUTLINED numeral above the claim. Filled at low opacity it
+    // came out a muddy olive — lime loses its identity the moment it is faded over near-black. An
+    // outline keeps the colour at full strength and still reads as background furniture.
+    doc.font(BOLD).fontSize(74).fillColor(THEME.brand).strokeColor(THEME.brand).lineWidth(1.4);
+    faded(doc, 0.75, () => {
+      doc.text(String(slide.n).padStart(2, "0"), PAD, blk.top - NUMERAL, {
+        lineBreak: false, characterSpacing: 1, fill: false, stroke: true,
+      });
+    });
+  } else {
+    // B: an accent bar down the left of the headline, drawn after the text so its height matches
+    // what the headline actually occupied rather than a guess at it.
+    doc.rect(PAD, blk.top + 8, 5, Math.max(52, blk.titleBottom - blk.top - 16)).fill(THEME.brand);
+  }
+}
 
-  doc.font(BOLD).fontSize(32).fillColor(BRAND.ink)
-    .text(slide.name, PAD, S * 0.78 + 34, { width: W, align: "center" });
-  doc.font(FONT).fontSize(24).fillColor(BRAND.muted)
-    .text(slide.site, PAD, S * 0.78 + 78, { width: W, align: "center" });
+/**
+ * The closing brand slide. Its job is recall, not information, so it carries no post content at all
+ * — which also makes it the one slide that structurally cannot fail the source-similarity gate.
+ * The lockup is stacked and large here; this is the one place the mark is allowed to dominate.
+ */
+function drawBrand(doc, slide, ctx) {
+  ground(doc, ctx.i);
+  header(doc, ctx.kicker);
+
+  const S = SLIDE_SIZE;
+  mark(doc, S / 2, 452, 116, { ground: THEME.bg0 });
+
+  doc.font(BOLD).fontSize(62).fillColor(THEME.ink)
+    .text("MIGI", PAD, 610, { width: W, align: "center", characterSpacing: 9 });
+
+  doc.font(FONT).fontSize(22).fillColor(THEME.brand)
+    .text(slide.descriptor, PAD, 690, { width: W, align: "center" });
+
+  faded(doc, 0.8, () => {
+    doc.moveTo(S * 0.40, 752).lineTo(S * 0.60, 752).lineWidth(1).strokeColor(THEME.rule).stroke();
+  });
+
+  // The identity, once. The header lockup and the wordmark above already say MIGI twice; a third
+  // "Created by MIGI" here said nothing new, while the person whose deck this is went unnamed
+  // because the footer suppresses its copy on this slide.
+  doc.font(BOLD).fontSize(26).fillColor(THEME.ink)
+    .text(slide.name, PAD, 780, { width: W, align: "center" });
+  doc.font(FONT).fontSize(17).fillColor(THEME.dim)
+    .text(slide.site, PAD, 816, { width: W, align: "center" });
 }
 
 const DRAW = { hook: drawHook, point: drawPoint, brand: drawBrand };
@@ -148,31 +348,37 @@ const DRAW = { hook: drawHook, point: drawPoint, brand: drawBrand };
  * Render slides to PDF bytes.
  *
  * @param {object[]} slides  from buildSlides(); the last one must be the brand slide
- * @param {{title?: string, compress?: boolean}} meta
- *   `title` lands in the PDF metadata, and is what LinkedIn shows.
- *   `compress: false` leaves the content streams readable — the only way to PROVE the text layer
- *   exists rather than assume it, since a compressed stream is opaque to any assertion. Used by the
- *   eval suite; production always ships compressed.
+ * @param {{title?: string, kicker?: string, compress?: boolean}} meta
+ *   `title` lands in the PDF metadata and is what LinkedIn shows in the feed.
+ *   `kicker` is the header label — brand furniture, not a claim about the article.
+ *   `compress: false` leaves the content streams readable, which is the only way to PROVE the text
+ *   layer exists rather than assume it. Used by the eval suite; production ships compressed.
  * @returns {Promise<Buffer>}
  */
-export function renderCarousel(slides, { title = "", compress = true } = {}) {
+export function renderCarousel(slides, { title = "", kicker = "AI, in practice", compress = true } = {}) {
   return new Promise((resolve, reject) => {
     if (!Array.isArray(slides) || !slides.length) return reject(new Error("no slides to render"));
 
+    const brand = slides.find((s) => s.kind === "brand") || {};
     const doc = new PDFDocument({
       size: [SLIDE_SIZE, SLIDE_SIZE],
       margin: 0,
       compress,
-      info: { Title: title || "Carousel", Author: slides.at(-1)?.name || "" },
+      info: { Title: title || "Carousel", Author: brand.name || "" },
     });
     const chunks = [];
     doc.on("data", (c) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
+    const total = slides.length;
     slides.forEach((slide, i) => {
       if (i) doc.addPage();
-      (DRAW[slide.kind] || drawPoint)(doc, slide);
+      (DRAW[slide.kind] || drawPoint)(doc, slide, { i, kicker });
+      // The brand slide carries the identity centred and large, so the footer drops its copy of it
+      // — printing "Suman Debnath" twice on the same slide read as an oversight, because it was.
+      // The pill stays: the reader still wants to see they have reached the end.
+      footer(doc, { name: slide.kind === "brand" ? "" : brand.name, site: brand.site, n: i + 1, total });
     });
 
     doc.end();
@@ -184,7 +390,7 @@ export function renderCarousel(slides, { title = "", compress = true } = {}) {
  *
  * Those platforms cannot take a PDF, and 10c-post.js archives the card art so the same image can be
  * reused when a post is repurposed (see its `card: archived` step). A carousel must not silently
- * break that, so the hook slide is also renderable as a picture — rebuilt in SVG through the card's
+ * break that, so the hook slide is also renderable as a picture — rebuilt through the card's
  * existing resvg pipeline rather than extracted from the PDF, because rasterising a PDF would mean
  * a new dependency for one image.
  *

@@ -10,7 +10,7 @@
 //   4. DETERMINISM — the draft agent previews the deck and the publish agent rebuilds it. If the
 //      same post can produce two different outlines, you approve one carousel and publish another.
 import { runCases, isMain } from "../_lib.mjs";
-import { buildSlides, segments, compress, clampChars, openingLine, documentTitle, brandSlide } from "../../agents/10-linkedin/slides.js";
+import { buildSlides, segments, compress, clampChars, openingLine, documentTitle, brandSlide, traceableTo, unsupportedFigures } from "../../agents/10-linkedin/slides.js";
 import { renderCarousel, hookPng } from "../../agents/10-linkedin/carousel.js";
 
 // ---- Fixtures: the shapes a real drafted post actually arrives in --------------------------
@@ -201,8 +201,76 @@ export async function run() {
       check: () => {
         const t = documentTitle(ALL_RESTATE, { sourceHeadline: SOURCE });
         if (/governance/i.test(t) && /data layer/i.test(t)) return { ok: false, note: `title restates the source: "${t}"` };
-        if (!t) return { ok: false, note: "no title produced" };
+        // "" is the correct answer when no line clears the bar. The alternative is inventing one,
+        // which is what the old "A short read" fallback did — and the title is a surface LinkedIn
+        // renders in the feed, so a made-up one is a published claim from nowhere.
         return { ok: true };
+      },
+    },
+  ], (c) => c.check());
+
+  // ---- Provenance: nothing on a slide came from anywhere but the post ------------------------
+  // The splitter physically cannot invent content — it only slices and trims sentences already in
+  // the post — but "cannot" is worth nothing unasserted. The post itself is written by 10a-draft.js
+  // from the article it actually read, under an explicit "every fact, number, name and quote must
+  // come from it" instruction, so post-traceability is the last link in the chain from article to
+  // slide.
+  const r5b = runCases("linkedin-slides · every slide traces back to the post", [
+    { id: "numbered",   post: NUMBERED },
+    { id: "bullets",    post: BULLETS },
+    { id: "paragraphs", post: PARAGRAPHS },
+    { id: "blob",       post: ONE_BLOB },
+  ], (c) => {
+    const d = deck(c.post);
+    for (const s of d.slides) {
+      if (s.kind === "brand") continue;          // brand furniture, deliberately not post content
+      for (const part of [s.title, s.body]) {
+        if (part && !traceableTo(part, c.post)) {
+          return { ok: false, note: `slide text is not in the post: "${part}"` };
+        }
+      }
+    }
+    return { ok: true };
+  });
+
+  const r5c = runCases("linkedin-slides · invents nothing, flags unsupported figures", [
+    {
+      id: "no-invented-title",
+      check: () => {
+        // documentTitle used to fall back to the literal string "A short read" — words from nowhere
+        // in the post and nowhere in the article, on a surface LinkedIn shows in the feed.
+        const t = documentTitle(EMPTY);
+        if (t && !traceableTo(t, EMPTY)) return { ok: false, note: `invented a title: "${t}"` };
+        return { ok: true };
+      },
+    },
+    {
+      id: "figure-in-article-passes",
+      check: () => {
+        const post = "Adoption jumped 40% last quarter.\n\nThat is the number that matters.\n\nEverything else is noise.\n\nThe gap is structural.";
+        const article = "The report found adoption jumped 40% last quarter across surveyed teams.";
+        const bad = unsupportedFigures(deck(post).slides, article);
+        return bad.length ? { ok: false, note: `flagged a figure the article contains: ${JSON.stringify(bad)}` } : { ok: true };
+      },
+    },
+    {
+      id: "figure-not-in-article-flagged",
+      check: () => {
+        const post = "Adoption jumped 87% last quarter.\n\nThat is the number that matters.\n\nEverything else is noise.\n\nThe gap is structural.";
+        const article = "The report found adoption jumped 40% last quarter across surveyed teams.";
+        const bad = unsupportedFigures(deck(post).slides, article);
+        return bad.some((b) => b.figure.includes("87"))
+          ? { ok: true }
+          : { ok: false, note: "an 87% that appears nowhere in the article was not flagged" };
+      },
+    },
+    {
+      id: "no-article-no-false-claims",
+      check: () => {
+        // readArticle returns null for hosts that defeat the scraper. An unverifiable deck must not
+        // be reported as a verified one, so with no article there is nothing to say.
+        const bad = unsupportedFigures(deck(NUMBERED).slides, null);
+        return bad.length === 0 ? { ok: true } : { ok: false, note: "claimed a verdict with no article to check against" };
       },
     },
   ], (c) => c.check());
@@ -255,6 +323,29 @@ export async function run() {
         if (!`${title} ${body}`.includes("somewhere")) return { ok: false, note: "lost the last word of the claim" };
         if (title.length > 100) return { ok: false, note: `title ${title.length} chars, past the hard limit` };
         return { ok: true };
+      },
+    },
+    {
+      id: "preamble-does-not-become-the-headline",
+      check: () => {
+        // A real slide read "In my work with AI-native products" in 60pt, with the actual claim
+        // demoted to the supporting line. The setup is not the point.
+        const { title, body } = compress("In my work with AI-native products, the data layer is where that control actually lives. Prompts are advisory, schemas are not.");
+        if (/^in my work/i.test(title)) return { ok: false, note: `headline is the setup, not the claim: "${title}"` };
+        if (!/data layer/i.test(title)) return { ok: false, note: `claim did not become the headline: "${title}"` };
+        if (!traceableTo(title, "In my work with AI-native products, the data layer is where that control actually lives. Prompts are advisory, schemas are not.")) {
+          return { ok: false, note: `stripping the preamble broke traceability: "${title}"` };
+        }
+        return { ok: true, note: body ? "" : "no body (warn)" };
+      },
+    },
+    {
+      id: "preamble-strip-leaves-real-openers-alone",
+      check: () => {
+        // "Every system that survived…" has no setup clause to remove, and a comma later in the
+        // sentence must not be mistaken for one.
+        const { title } = compress("Every system that survived contact with production, without exception, had a human gate.");
+        return /^every system/i.test(title) ? { ok: true } : { ok: false, note: `mangled a normal claim: "${title}"` };
       },
     },
     {
@@ -315,8 +406,10 @@ export async function run() {
   const r8b = runCases("linkedin-slides · slides carry a real text layer", [
     { id: "hook-text-present",  needle: "Most teams are automating" },
     { id: "point-text-present", needle: "verification at scale" },
-    { id: "brand-text-present", needle: "Created by MIGI" },
+    { id: "brand-text-present", needle: "MIGI" },
     { id: "author-text-present", needle: "Suman Debnath" },
+    { id: "site-text-present",  needle: "sumandebnath.houseofnamus.com" },
+    { id: "pill-text-present",  needle: "01 / 06" },
   ], (c) => {
     // Compared with whitespace removed on both sides. pdfkit emits a line as a TJ array split at
     // kerning pairs ("aut" -20 "omating") and starts a fresh operator at every wrapped line, so a
@@ -342,7 +435,7 @@ export async function run() {
     },
   ], (c) => c.check());
 
-  return [r1, r2, r3, r4, r5, r6, r7, r8, r8b, r9];
+  return [r1, r2, r3, r4, r5, r5b, r5c, r6, r7, r8, r8b, r9];
 }
 
 if (isMain(import.meta.url)) {
