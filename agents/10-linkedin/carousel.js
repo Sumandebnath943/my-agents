@@ -354,23 +354,29 @@ function drawPoint(doc, slide, ctx) {
     title: slide.title, body: slide.body, left, width,
     top: BODY_TOP, bottom: BODY_BOT,
     titleMax: 68, titleMin: 32,
-    lead: variantA ? NUMERAL : 0,
+    lead: NUMERAL,
   });
 
-  if (variantA) {
-    // A: the point number as a large OUTLINED numeral above the claim. Filled at low opacity it
-    // came out a muddy olive — lime loses its identity the moment it is faded over near-black. An
-    // outline keeps the colour at full strength and still reads as background furniture.
-    doc.font(BOLD).fontSize(74).fillColor(THEME.brand).strokeColor(THEME.brand).lineWidth(1.4);
-    faded(doc, 0.75, () => {
-      doc.text(String(slide.n).padStart(2, "0"), PAD, blk.top - NUMERAL, {
-        lineBreak: false, characterSpacing: 1, fill: false, stroke: true,
-      });
+  // EVERY point slide is numbered. The numeral used to belong to variant A only, so the count
+  // disappeared on alternating slides — the reader lost their place, and the deck read as if two
+  // different templates had been mixed. Numbering is information; variation is the accent bar.
+  //
+  // Outlined rather than filled at low opacity: lime loses its identity the moment it is faded over
+  // near-black and comes out a muddy olive. An outline keeps the colour at full strength while
+  // still reading as furniture rather than as a headline.
+  doc.font(BOLD).fontSize(74).fillColor(THEME.brand).strokeColor(THEME.brand).lineWidth(1.4);
+  faded(doc, 0.75, () => {
+    doc.text(String(slide.n).padStart(2, "0"), variantA ? PAD : left, blk.top - NUMERAL, {
+      lineBreak: false, characterSpacing: 1, fill: false, stroke: true,
     });
-  } else {
-    // B: an accent bar down the left of the headline, drawn after the text so its height matches
-    // what the headline actually occupied rather than a guess at it.
-    doc.rect(PAD, blk.top + 8, 5, Math.max(52, blk.titleBottom - blk.top - 16)).fill(THEME.brand);
+  });
+
+  if (!variantA) {
+    // B keeps the accent bar as its distinguishing element, spanning the numeral and the headline
+    // so the two read as one group. Drawn after the text so its height matches what the headline
+    // actually occupied rather than a guess at it.
+    const top = blk.top - NUMERAL + 18;
+    doc.rect(PAD, top, 5, Math.max(52, blk.titleBottom - top - 8)).fill(THEME.brand);
   }
 }
 
