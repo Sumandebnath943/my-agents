@@ -63,7 +63,58 @@ const commentary = (escapeLI(cleanPost) + (row.hashtags ? `\n\n${row.hashtags}` 
 // Upload permission was verified against the live API (scripts/linkedin-image-spike.mjs).
 let mediaId = null;
 let cardAlt = null;   // the card's OWN line — never the source headline, which is the thing being avoided
-if (process.env.LINKEDIN_POST_IMAGE === "1") {
+let docTitle = null;  // documents take `title`, NOT altText — there is no alt-text field for them
+
+// ---- Carousel ------------------------------------------------------------------------------
+// Uploads the EXACT bytes approved on Telegram, read back from Supabase storage, rather than
+// re-deriving the deck here. The card is re-derived and matches only because rendering is
+// deterministic; a carousel additionally depends on the article, which is not persisted, so
+// rebuilding it at publish time could not reproduce the approved deck even in principle.
+//
+// Capability was proven live before any of this was written: /rest/documents?action=initializeUpload
+// returns 200 on the w_member_social scope this app already holds, and the PUT returns 201
+// (scripts/linkedin-document-spike.mjs). Every failure path below falls through to the card, which
+// falls through to text — a media problem must never cost the post.
+if (process.env.LINKEDIN_POST_CAROUSEL === "1") {
+  try {
+    const dl = await db.storage.from("linkedin").download(`carousel-${postId}.pdf`);
+    if (dl.error || !dl.data) throw new Error(`no approved deck in storage (${dl.error?.message || "not found"})`);
+    const pdf = Buffer.from(await dl.data.arrayBuffer());
+    if (pdf.length < 1000 || pdf.subarray(0, 5).toString("latin1") !== "%PDF-") {
+      throw new Error(`stored file is not a usable PDF (${pdf.length} bytes)`);
+    }
+
+    const initRes = await fetch("https://api.linkedin.com/rest/documents?action=initializeUpload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/json", "LinkedIn-Version": LINKEDIN_API_VERSION, "X-Restli-Protocol-Version": "2.0.0" },
+      body: JSON.stringify({ initializeUploadRequest: { owner: token.person_urn } }),
+    });
+    if (!initRes.ok) throw new Error(`documents initializeUpload ${initRes.status}: ${(await initRes.text()).slice(0, 160)}`);
+    const init = (await initRes.json())?.value;
+    if (!init?.uploadUrl || !init?.document) throw new Error("documents initializeUpload returned no uploadUrl/document");
+
+    const put = await fetch(init.uploadUrl, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${access}`, "Content-Type": "application/pdf" },
+      body: pdf,
+    });
+    if (!put.ok) throw new Error(`document upload ${put.status}`);
+
+    mediaId = init.document;
+    // The title is a surface LinkedIn renders in the feed, so it went through the same
+    // source-similarity gate as the slides when the deck was built. Re-derived here only as a
+    // label; if it comes back empty the post still ships, titled by its first line.
+    const { documentTitle } = await import("./slides.js");
+    docTitle = documentTitle(cleanPost, { sourceHeadline: row.headline || "" }) || cleanPost.split("\n")[0].slice(0, 100);
+    console.log(`carousel: attached ${pdf.length} bytes as ${mediaId} — "${docTitle.slice(0, 70)}"`);
+  } catch (e) {
+    console.error(`carousel: SKIPPED, trying the card — ${e.message}`);
+    mediaId = null;
+    docTitle = null;
+  }
+}
+
+if (!mediaId && process.env.LINKEDIN_POST_IMAGE === "1") {
   try {
     const { renderCard, pickCardLine } = await import("./card.js");
     const { callLLM } = await import("../../lib/llm.js");
@@ -135,7 +186,13 @@ const res = await fetch("https://api.linkedin.com/rest/posts", {
     distribution: { feedDistribution: "MAIN_FEED", targetEntities: [], thirdPartyDistributionChannels: [] },
     lifecycleState: "PUBLISHED",
     isReshareDisabledByAuthor: false,
-    ...(mediaId ? { content: { media: { id: mediaId, altText: (cardAlt || "Insight card").slice(0, 300) } } } : {}),
+    // A document takes `title`; an image takes `altText`. They are NOT interchangeable — documents
+    // have no alt-text field at all, which is why the slides carry a real PDF text layer instead.
+    ...(mediaId
+      ? { content: { media: docTitle
+          ? { id: mediaId, title: docTitle.slice(0, 300) }
+          : { id: mediaId, altText: (cardAlt || "Insight card").slice(0, 300) } } }
+      : {}),
   }),
 });
 

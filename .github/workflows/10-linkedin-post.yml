@@ -29,6 +29,8 @@ jobs:
           # text-only. Card failures are caught and fall through to a text post, so this can never
           # cost the post itself.
           LINKEDIN_POST_IMAGE: "1"
+          # Carousel. MUST match 10-linkedin-draft.yml — see the note there.
+          LINKEDIN_POST_CAROUSEL: "1"
           TOKEN_ENC_KEY: ${{ secrets.TOKEN_ENC_KEY }}
           LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
           LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}

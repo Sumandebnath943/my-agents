@@ -12,6 +12,7 @@
 import { runCases, isMain } from "../_lib.mjs";
 import { buildSlides, segments, compress, clampChars, openingLine, documentTitle, brandSlide, traceableTo, unsupportedFigures } from "../../agents/10-linkedin/slides.js";
 import { renderCarousel, hookPng } from "../../agents/10-linkedin/carousel.js";
+import { readFileSync } from "node:fs";
 
 // ---- Fixtures: the shapes a real drafted post actually arrives in --------------------------
 const NUMBERED = `Most teams are automating the wrong half of the job.
@@ -435,7 +436,26 @@ export async function run() {
     },
   ], (c) => c.check());
 
-  return [r1, r2, r3, r4, r5, r5b, r5c, r6, r7, r8, r8b, r9];
+  // ---- The flag trap ------------------------------------------------------------------------
+  // HANDOFF.md:44 records this for LINKEDIN_POST_IMAGE and it applies identically to the carousel:
+  // the draft workflow decides what you are shown for approval, the post workflow decides what
+  // publishes. Set one and not the other and you approve media that never ships, or ship media you
+  // never saw — silently, with both runs green. Cheap to assert, expensive to discover live.
+  const wf = (f) => readFileSync(new URL(`../../.github/workflows/${f}`, import.meta.url), "utf8");
+  const flagIn = (src, name) => (src.match(new RegExp(`^\\s*${name}:\\s*"?([01])"?\\s*$`, "m")) || [])[1] ?? null;
+
+  const r10 = runCases("linkedin-slides · media flags match across both workflows", [
+    { id: "LINKEDIN_POST_CAROUSEL" },
+    { id: "LINKEDIN_POST_IMAGE" },
+  ], (c) => {
+    const draft = flagIn(wf("10-linkedin-draft.yml"), c.id);
+    const post = flagIn(wf("10-linkedin-post.yml"), c.id);
+    if (draft === null && post === null) return { ok: true, note: "declared in neither (warn)" };
+    if (draft !== post) return { ok: false, note: `draft="${draft}" but post="${post}" — approve one thing, publish another` };
+    return { ok: true };
+  });
+
+  return [r1, r2, r3, r4, r5, r5b, r5c, r6, r7, r8, r8b, r9, r10];
 }
 
 if (isMain(import.meta.url)) {

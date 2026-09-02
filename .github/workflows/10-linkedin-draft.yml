@@ -54,6 +54,10 @@ jobs:
           # before approval rather than discovered on the feed. Must match 10-linkedin-post.yml,
           # or you would approve a card that never ships (or ship one you never saw).
           LINKEDIN_POST_IMAGE: "1"
+          # Carousel. MUST match 10-linkedin-post.yml — this workflow decides what you are shown
+          # for approval, that one decides what publishes. Mismatched, you approve a deck that
+          # never ships or ship one you never saw. "0" falls straight back to the insight card.
+          LINKEDIN_POST_CAROUSEL: "1"
           EDIT_ID: ${{ github.event.inputs.edit_id }}
           EDIT_NOTE: ${{ github.event.inputs.edit_note }}
           NEWS_IDX: ${{ github.event.inputs.news_idx }}

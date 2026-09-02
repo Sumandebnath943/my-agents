@@ -11,7 +11,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { env } from "../../lib/env.js";
 import { callGroq, geminiThenGroq, parseJson } from "../../lib/llm.js";
-import { notifyTelegram, notifyTelegramPhoto, tgEscape } from "../../lib/notify.js";
+import { notifyTelegram, notifyTelegramPhoto, notifyTelegramDocument, tgEscape } from "../../lib/notify.js";
 import { PROFILE, profileContext } from "../../lib/profile.js";
 import { fetchXml, textOf, linkHref } from "../../lib/rss.js";
 import { AI_FEEDS, SCRAPE_BLOCKED } from "./sources.js";
@@ -195,7 +195,62 @@ async function recentPosts(days = 14) {
 const recentBlockOf = (recents) =>
   recents.length ? recents.map((r) => `- ${r.headline || "(untitled)"} — opened: "${r.opener}"`).join("\n") : "(none yet)";
 
-async function sendDraft(id, row) {
+/**
+ * Build the carousel, ARCHIVE it, and preview it above the Approve button.
+ *
+ * The bytes are stored here, at draft time, and 10c-post.js uploads exactly those bytes to
+ * LinkedIn. That is deliberate: the card is re-derived at publish time and matches only because
+ * rendering is deterministic, whereas what you approve here IS what ships. It also puts the deck
+ * where the article still exists — `linkedin_posts` stores headline/source_url/post/hashtags/
+ * grounding and NOT the article text, so a figure can only be checked against the source now.
+ *
+ * @returns {Promise<boolean>} true when a carousel was previewed and archived; false to fall back
+ *   to the insight card. Never throws: a media problem must not cost you the draft.
+ */
+async function previewCarousel(id, row, article) {
+  try {
+    const { buildSlides, documentTitle, unsupportedFigures } = await import("./slides.js");
+    const { renderCarousel } = await import("./carousel.js");
+
+    const post = stripMarkdown(row.post);
+    const deck = buildSlides(post, { sourceHeadline: row.headline || "" });
+    if (!deck.ok) {
+      await notifyTelegram(`🎞️ <i>No carousel for this one — ${tgEscape(deck.reason)}. Falling back to the card.</i>`, { html: true });
+      return false;
+    }
+
+    const title = documentTitle(post, { sourceHeadline: row.headline || "" });
+    const pdf = await renderCarousel(deck.slides, { title });
+
+    // Archive BEFORE previewing. If the bytes cannot be stored, publish would have nothing to
+    // upload, and previewing a deck that can never ship is worse than falling back to the card.
+    await db.storage.createBucket("linkedin", { public: false }).catch(() => {});
+    const up = await db.storage.from("linkedin").upload(`carousel-${id}.pdf`, pdf, { contentType: "application/pdf", upsert: true });
+    if (up.error) throw new Error(`could not archive the deck — ${up.error.message}`);
+
+    // Figures that are not in the article. NOT a block: the same figure is already in the post
+    // body and would publish as text regardless, so removing the carousel would hide the problem
+    // rather than fix it. Suman is the approver — this is for him to reject or edit on.
+    const bad = unsupportedFigures(deck.slides, article);
+    const points = deck.slides.filter((s) => s.kind === "point").length;
+    const notes = [
+      `🎞️ <b>Carousel for draft ${id}</b> — ${deck.slides.length} slides (${points} points + brand)`,
+      title ? `<i>title: ${tgEscape(title)}</i>` : "<i>no title cleared the source check</i>",
+      deck.dropped.length ? `<i>${deck.dropped.length} line(s) dropped — too close to the source headline</i>` : "",
+      bad.length ? `⚠️ <b>Unverified figures:</b> ${tgEscape(bad.map((b) => `${b.figure} (slide ${b.slide})`).join(", "))} — not found in the article. Check before approving.` : "",
+      article ? "" : "<i>article could not be read, so figures were not checked</i>",
+    ].filter(Boolean);
+
+    await notifyTelegramDocument(pdf, `carousel-${id}.pdf`, notes.join("\n"));
+    console.log(`carousel: ${deck.slides.length} slides, ${pdf.length} bytes, archived as linkedin/carousel-${id}.pdf`);
+    return true;
+  } catch (e) {
+    console.error(`carousel: SKIPPED, falling back — ${e.message}`);
+    return false;
+  }
+}
+
+async function sendDraft(id, row, article = null) {
   const buttons = [
     [{ text: "✅ Approve", callback_data: `li:approve:${id}` }, { text: "✏️ Edit", callback_data: `li:edit:${id}` }],
     [{ text: "🔄 Regenerate", callback_data: `li:regen:${id}` }],
@@ -206,9 +261,15 @@ async function sendDraft(id, row) {
     { html: true, buttons }
   );
 
-  // Show the card BEFORE approval — you should see the picture that will carry your name, not
-  // discover it on the feed. Rendering is deterministic, so this preview is byte-identical to what
-  // publish will attach for the same text. Best-effort: a preview failure must never block a draft.
+  // Show the media BEFORE approval — you should see what will carry your name, not discover it on
+  // the feed. Best-effort throughout: a preview failure must never block a draft.
+  //
+  // Carousel first, card second, text third. Each step degrades to the next rather than failing,
+  // so the worst outcome is the behaviour that was already running before any of this existed.
+  if (process.env.LINKEDIN_POST_CAROUSEL === "1" && (await previewCarousel(id, row, article))) return;
+
+  // Rendering is deterministic, so this card preview is byte-identical to what publish will attach
+  // for the same text.
   if (process.env.LINKEDIN_POST_IMAGE === "1") {
     try {
       const { renderCard, pickCardLine } = await import("./card.js");
@@ -395,7 +456,11 @@ Voice bar: ${VALUE_BAR}`,
     }).select("id").single();
     id = inserted?.id;
   }
-  await sendDraft(id, { headline: item.headline, post: o.post, hashtags, grounding: o.grounding, warning });
+  // `article` is passed through so the carousel's figures can be checked against the source. This
+  // is the ONLY point in the pipeline where it exists — it is never written to linkedin_posts, so
+  // by publish time it is gone. The EDIT path below therefore passes nothing, and the check
+  // correctly reports no verdict rather than a false clean one.
+  await sendDraft(id, { headline: item.headline, post: o.post, hashtags, grounding: o.grounding, warning }, article);
   console.log(regenOf ? "regenerated draft" : "draft sent", "id", id);
 }
 
