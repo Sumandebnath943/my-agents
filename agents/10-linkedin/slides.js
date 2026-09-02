@@ -191,7 +191,23 @@ export function compress(segment, { titleMax = 140, bodyMax = 200 } = {}) {
     };
   }
 
-  const parts = sentences(lines.join(" "));
+  const joined = lines.join(" ");
+
+  // "Explicit Data Provenance: Every AI answer must point to the exact source…" — a short label
+  // introducing its own explanation. This is the shape Suman's numbered lists take, and the label
+  // IS the slide headline with the rest as its supporting line. Split here regardless of length:
+  // treated as one sentence, the pair filled a whole slide as an unreadable 140-character headline.
+  //
+  // The 48-character cap is what keeps this from firing on an ordinary sentence that happens to
+  // contain a colon — "Nvidia's evolution is a call to action for all AI builders: focus on the
+  // systems" has a 57-character left side and correctly stays whole. Requiring whitespace after the
+  // colon also keeps clock times and URLs out.
+  const label = joined.match(/^(.{4,48}?):\s+(\S[\s\S]*)$/);
+  if (label && !/[.!?]/.test(label[1])) {
+    return { title: clampChars(label[1], HARD), body: capitalise(clampChars(label[2], bodyMax)) };
+  }
+
+  const parts = sentences(joined);
   let title = parts[0] || s;
   let rest = parts.slice(1).join(" ").trim();
 
@@ -272,7 +288,11 @@ export function buildSlides(post, { sourceHeadline = "", maxPoints = MAX_POINTS,
   // itself restates the source, fall through to the segments in order rather than abandoning: the
   // gate should cost you a line, not the whole carousel.
   const hookCandidates = [openingLine(post), ...segs].filter((s) => s && !isConnector(s));
-  const hookSeg = hookCandidates.find((s) => sim(s) <= maxSim);
+  // The hook carries no supporting line, so unlike a point slide it cannot lean on one. A bare
+  // label ("Immutable Audit Trails") makes a thin opening slide — prefer something with substance,
+  // and only settle for a short opener when the post offers nothing longer.
+  const clears = (s) => sim(s) <= maxSim;
+  const hookSeg = hookCandidates.find((s) => s.length >= 25 && clears(s)) || hookCandidates.find(clears);
   if (!hookSeg) {
     return { ok: false, slides: [], dropped: segs.map((s) => ({ text: s, similarity: Number(sim(s).toFixed(2)) })), reason: "every line restates the source headline" };
   }

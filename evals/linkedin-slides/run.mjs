@@ -552,6 +552,44 @@ export async function run() {
       },
     },
     {
+      id: "86-label-and-detail-are-split",
+      check: () => {
+        // From the first LIVE draft (post 86). Suman's numbered lists are label-then-explanation,
+        // and treated as one sentence the pair filled a whole slide as a 140-character headline.
+        const post = "Compliance isn't a checkbox for AI in high-stakes fields. It's the architecture.\n\n1. Explicit Data Provenance: Every AI answer must point to the exact source that generated it, just like the chart references in the news.\n\n2. How we implemented it: In my banking co-pilot we attached a source ID to each data point and surfaced it in the UI, so users can verify the origin instantly.\n\n3. Why it matters: When clinicians see the original record, they can trust the suggestion and make the final call.";
+        const d = deck(post);
+        const first = d.slides.find((s) => s.kind === "point");
+        if (!/^Explicit Data Provenance$/.test(first.title)) {
+          return { ok: false, note: `label was not lifted out: "${first.title}"` };
+        }
+        if (!/^Every AI answer/.test(first.body)) return { ok: false, note: `detail missing: "${first.body}"` };
+        return { ok: true };
+      },
+    },
+    {
+      id: "ordinary-colon-sentence-stays-whole",
+      check: () => {
+        // The guard on the rule above. A long left-hand side means the colon is punctuation inside
+        // a sentence, not a label, and the sentence must survive intact.
+        const { title, body } = compress("Nvidia's evolution is a call to action for all AI builders: focus on the systems, not just the components.");
+        if (!/^Nvidia/.test(title) || !/components/.test(`${title} ${body}`)) {
+          return { ok: false, note: `mangled a sentence containing a colon: "${title}" >> "${body}"` };
+        }
+        if (body) return { ok: false, note: `split an ordinary sentence at its colon: "${title}"` };
+        return { ok: true };
+      },
+    },
+    {
+      id: "hook-is-not-a-bare-label",
+      check: () => {
+        const post = "Bounded Autonomy\n\nHard-coded limits on what an agent can access or execute keep the blast radius small.\n\nEvery system that survived production had a human gate somewhere in it.\n\nThat habit keeps operators ahead of complexity.";
+        const hook = deck(post).slides[0];
+        return hook.title.length >= 25
+          ? { ok: true }
+          : { ok: false, note: `opened the deck on a bare label: "${hook.title}"` };
+      },
+    },
+    {
       id: "corpus-shaped-post-still-traceable",
       check: () => {
         // Everything above rewrites less than it used to, so re-assert the invariant that matters.
