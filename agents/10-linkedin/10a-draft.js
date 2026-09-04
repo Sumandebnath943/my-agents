@@ -707,9 +707,52 @@ Return ONLY JSON {"picks":[{"i":<index>,"why":"one short line: why it matters to
   { json: true }
 );
 
-let picks = [];
-try { picks = parseJson(curated).picks || []; } catch { picks = []; }
+// ─────────────────────────────────────────────────────────────────────────────────────────────
+// "NOTHING WORTH POSTING" MUST MEAN THE CURATOR CHOSE NOTHING — NOT THAT WE COULD NOT READ IT.
+//
+// This block used to be `try { picks = parseJson(curated).picks || []; } catch { picks = []; }`,
+// which collapsed FOUR different outcomes into one green exit: an answer that would not parse, an
+// answer with no `picks` key, picks whose indices matched no headline, and a genuine "no news".
+// Only the last is an editorial decision; the other three are failures.
+//
+// On 2026-09-04 that cost a day's draft. The curation call SUCCEEDED — Gemini, 31.8s, 3,865 tokens
+// — and the run still printed "nothing worth posting" and exited 0, so nothing anywhere recorded a
+// problem. The cause could not be established afterwards, because the raw answer had been thrown
+// away by the `catch`. Replaying the same call could not reproduce it, which is exactly why the
+// evidence has to be captured at the moment it happens rather than reconstructed later.
+//
+// So: an unusable answer now EXITS NON-ZERO. That makes it visible to Failure Triage, and it leaves
+// the gate claim unconfirmed — which keeps the slot open for a retry instead of silently consuming
+// it. A genuinely empty pick list still exits 0, because that is a real answer.
+let picks = null, parseErr = null;
+try { picks = parseJson(curated).picks; } catch (e) { parseErr = e.message; }
+
+if (parseErr || !Array.isArray(picks)) {
+  const raw = String(curated ?? "").replace(/\s+/g, " ").slice(0, 600);
+  console.error(
+    `Curate: the model's answer was unusable — ${parseErr ? `parse failed (${parseErr})` : `no "picks" array (got ${picks === undefined ? "undefined" : typeof picks})`}.\n` +
+    `  headlines offered: ${headlines.length}\n` +
+    `  raw answer: ${raw || "(empty)"}`
+  );
+  process.exit(1);
+}
+
+// Keep the indices the model ACTUALLY returned before filtering — reporting the post-filter list
+// would always print an empty array in the one branch that needs it.
+const offeredIdx = picks.map((p) => p?.i);
 picks = picks.filter((p) => headlines[p.i]).slice(0, 7);
+
+// Picks came back but none pointed at a real headline — the model answered the wrong question, or
+// indexed something that is not there. Also a failure, and it looked identical to "no news" before.
+if (offeredIdx.length > 0 && !picks.length) {
+  console.error(
+    `Curate: ${offeredIdx.length} pick(s) returned but NONE matched a headline index (valid range 0-${headlines.length - 1}).\n` +
+    `  indices returned: ${JSON.stringify(offeredIdx.slice(0, 10))}\n` +
+    `  raw answer: ${String(curated ?? "").replace(/\s+/g, " ").slice(0, 300)}`
+  );
+  process.exit(1);
+}
+
 if (!picks.length) { console.log("Curate: nothing worth posting today."); process.exit(0); }
 
 const batchId = Date.now().toString(36);
