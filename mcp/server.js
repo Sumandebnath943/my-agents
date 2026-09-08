@@ -91,7 +91,10 @@ export const TOOLS = [
     sideEffect: true,
     description: "Send a plain-text message to Suman's Telegram (notifications/answers).",
     inputSchema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
-    handler: async ({ text }) => { await notifyTelegram(text); return "ok: sent"; },
+    // Short flood-wait ceiling: this send is interactive. A scheduled agent can afford to sit
+    // out a six-minute Telegram cooldown to save its output; an MCP client waiting on a tool
+    // call cannot, and here the caller is present and can simply send again.
+    handler: async ({ text }) => { await notifyTelegram(text, { maxWaitMs: 20_000 }); return "ok: sent"; },
   },
   {
     name: "memory_remember",
