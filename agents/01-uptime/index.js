@@ -6,19 +6,36 @@ import { notifyTelegram, tgEscape } from "../../lib/notify.js";
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const UA = "Mozilla/5.0 (compatible; MigiUptime/1.0; +https://houseofnamus.com)";
 
+// ⚠️ THE TWO LINES THAT LOOK LIKE HOUSEKEEPING ARE WHY THIS AGENT USED TO GET KILLED.
+// Every probe left an idle keep-alive socket in fetch's connection pool, and an open socket keeps
+// Node alive. Locally that costs ~6s; on a GitHub runner the idle sockets never got their FIN, so
+// undici waited out its full 600s keepAliveMaxTimeout — the work finished in 24s and the process
+// sat there until `timeout-minutes: 10` killed the job. Three "cancelled" runs (3 Sep, 4 Sep,
+// 12 Sep) were this, and each one left its slot unfulfilled. `Connection: close` keeps the socket
+// out of the pool; cancelling the body releases it the moment we have the status, which is all a
+// liveness check ever needed. Do not "tidy" either of them away.
 async function probe(url) {
   const start = Date.now();
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12000); // 12s hard timeout
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 12000); // 12s hard timeout
-    const res = await fetch(url, { signal: ctrl.signal, redirect: "follow", headers: { "User-Agent": UA } });
-    clearTimeout(t);
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: { "User-Agent": UA, Connection: "close" },
+    });
     const ms = Date.now() - start;
+    // We read the status, never the body — so drop it and let the socket go. In its own try:
+    // a cleanup step must never be able to turn a healthy site into a DOWN verdict.
+    try { await res.body?.cancel(); } catch {}
     const reachable = res.status < 400; // 2xx/3xx (redirects, auth pages) = reachable
     const status = reachable ? (ms > SLOW_MS ? "SLOW" : "UP") : "DOWN";
     return { status, code: res.status, ms };
   } catch (e) {
     return { status: "DOWN", code: 0, ms: Date.now() - start, error: e.name };
+  } finally {
+    clearTimeout(t);   // the old code cleared this only when the fetch resolved, so every failed
+                       // probe left a live 12s timer behind as well
   }
 }
 
