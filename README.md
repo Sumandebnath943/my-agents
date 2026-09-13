@@ -97,6 +97,17 @@ Behaviour changes are caught by evals, not in production.
   offline and deterministically.
 - **Secrets never touch the repo.** All credentials are injected from GitHub Secrets at run
   time. Nothing sensitive has ever been committed to this history.
+- **An agent must exit when its work is done.** Finishing the work is not the same as ending the
+  process: an open socket or a live timer keeps Node running, and a runner will happily bill for
+  the silence until `timeout-minutes` kills the job. The uptime agent finished in 24 seconds and
+  was killed at 622 on three separate days for exactly this reason — every `fetch` left an idle
+  keep-alive socket in the connection pool, and undici waited out its 600-second ceiling. So:
+  send `Connection: close` on fire-and-forget requests, cancel response bodies you never read,
+  and clear every timer in a `finally`, not on the success path.
+- **A failure must not be able to impersonate a setting.** Clients that return errors instead of
+  throwing (Supabase's does) make "it said no" and "it never answered" the same value. Check the
+  error, and make the difference visible — a system that reports a fault as a configuration
+  choice cannot be debugged by the person reading the report.
 
 ## Repository layout
 
