@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "22" }
+        with: { node-version: "22", cache: "npm" }
       - run: npm ci
       # Run gate — has the dispatcher already covered this scheduled slot? Only `schedule`
       # events are gated; a dispatch or a human pressing Run always proceeds. continue-on-error
@@ -64,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "22" }
+        with: { node-version: "22", cache: "npm" }
       - run: npm ci
       # Run gate — has the dispatcher already covered this scheduled slot? Only `schedule`
       # events are gated; a dispatch or a human pressing Run always proceeds. continue-on-error

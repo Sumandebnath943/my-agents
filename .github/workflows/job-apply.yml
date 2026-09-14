@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "22" }
+        with: { node-version: "22", cache: "npm" }
       - run: npm ci
       - run: npm i playwright --no-save && npx playwright install --with-deps chromium
       - run: node agents/job-agent/apply/run.js --id "${{ inputs.job_id }}" --mode "${{ inputs.mode }}"
